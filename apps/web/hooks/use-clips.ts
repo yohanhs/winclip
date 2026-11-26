@@ -69,7 +69,7 @@ export function useDeleteClip(projectId: string | null | undefined) {
 /** `POST /api/clips/{id}/rerender` tras recortar o cambiar tiempos. */
 export function useRerenderClip(projectId: string | null | undefined) {
   const api = useApiClient();
-  const invalidate = useInvalidateClip(projectId);
+  const queryClient = useQueryClient();
 
   return useMutation<JobOut, Error, string>({
     mutationFn: async (clipId) => {
@@ -79,7 +79,19 @@ export function useRerenderClip(projectId: string | null | undefined) {
       if (!response.data) throw new Error("No se pudo re-renderizar el clip");
       return response.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (_job, clipId) => {
+      if (projectId) {
+        queryClient.setQueryData<ClipOut[]>(
+          ["project-clips", projectId],
+          (clips) =>
+            clips?.map((clip) =>
+              clip.id === clipId ? { ...clip, status: "rendering" } : clip,
+            ),
+        );
+        void queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      }
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
   });
 }
 

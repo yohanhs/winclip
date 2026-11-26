@@ -1,2 +1,14 @@
 export { ProjectCard } from "./project-card";
 export { ProjectList } from "./project-list";
+export { ProjectDetail } from "./project-detail";
+export { PipelineStepper } from "./pipeline-stepper";
+export { ClipGrid } from "./clip-grid";
+export { ClipCard } from "./clip-card";
+export { ClipPlayerDialog } from "./clip-player-dialog";
+export { ClipEditDialog } from "./clip-edit-dialog";
+export { ClipTrimDialog } from "./clip-trim-dialog";
+export { MiniTimeline } from "./mini-timeline";
+export { SelectionActionBar } from "./selection-action-bar";
+export { FileDropzone } from "./file-dropzone";
+export { SubtitlePresetPreview } from "./subtitle-preset-preview";
+export { ProjectCreateForm } from "./project-create-form";
