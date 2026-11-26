@@ -32,10 +32,10 @@ def test_defaults_load_without_env_file() -> None:
 def test_llm_defaults_load_without_env_file() -> None:
     settings = _settings()
 
-    assert settings.gemini_model == "gemini-2.5-flash"
-    assert settings.nvidia_model == "meta/llama-3.3-70b-instruct"
-    assert settings.openrouter_model == "meta-llama/llama-3.3-70b-instruct:free"
-    assert settings.groq_model == "llama-3.3-70b-versatile"
+    assert settings.gemini_model == "gemini-3.8-flash"
+    assert settings.nvidia_model == "nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert settings.openrouter_model == "nvidia/nemotron-3.5-lightning:free"
+    assert settings.groq_model == "qwen/qwen3.8-27b"
     assert settings.ollama_model == "qwen3.5:4b"
     assert settings.llm_timeout_seconds == 60
     assert settings.llm_max_retries_per_provider == 2

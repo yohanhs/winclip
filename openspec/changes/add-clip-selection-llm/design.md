@@ -24,10 +24,10 @@ Contratos nuevos o ampliaciones compatibles introducidas por este change (sin mo
 
 ### 1. Variables de configuración opcionales en `core/config.py`
 Todas tienen valores por defecto seguros para mantener arranque sin `.env`:
-- `GEMINI_MODEL` = `"gemini-2.5-flash"`
-- `NVIDIA_MODEL` = `"meta/llama-3.3-70b-instruct"`
-- `OPENROUTER_MODEL` = `"meta-llama/llama-3.3-70b-instruct:free"`
-- `GROQ_MODEL` = `"llama-3.3-70b-versatile"`
+- `GEMINI_MODEL` = `"gemini-3.8-flash"`
+- `NVIDIA_MODEL` = `"nvidia/nemotron-3.5-lightning-30b-a3b"`
+- `OPENROUTER_MODEL` = `"nvidia/nemotron-3.5-lightning:free"`
+- `GROQ_MODEL` = `"qwen/qwen3.8-27b"`
 - `OLLAMA_MODEL` = `"qwen3.5:4b"`
 - `LLM_TIMEOUT_SECONDS` = `60`
 - `LLM_MAX_RETRIES_PER_PROVIDER` = `2`

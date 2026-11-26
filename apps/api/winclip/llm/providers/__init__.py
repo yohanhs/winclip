@@ -80,6 +80,8 @@ class OllamaProvider(OpenAICompatibleProvider):
             api_key="ollama",
             model=settings.ollama_model,
             client=client,
+            # "ollama" es una clave ficticia: no debe redactarse en los errores.
+            error_secrets=[],
         )
         self._host = host
         self._http_client = http_client

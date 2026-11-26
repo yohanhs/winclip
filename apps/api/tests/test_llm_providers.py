@@ -60,6 +60,27 @@ class FakeOpenAIClient:
         self.chat = SimpleNamespace(completions=self.completions)
 
 
+class FakeSequencedCompletions:
+    """Devuelve o lanza cada resultado de la lista en orden de llamada."""
+
+    def __init__(self, outcomes: list[Any]) -> None:
+        self.outcomes = list(outcomes)
+        self.calls: list[dict[str, Any]] = []
+
+    def create(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+
+class FakeSequencedClient:
+    def __init__(self, outcomes: list[Any]) -> None:
+        self.completions = FakeSequencedCompletions(outcomes)
+        self.chat = SimpleNamespace(completions=self.completions)
+
+
 class FakeGeminiModels:
     def __init__(self, outcome: Any) -> None:
         self.outcome = outcome
@@ -106,7 +127,7 @@ def test_gemini_requires_key_and_forces_json_schema() -> None:
 
     assert result == Ping(ok=True)
     call = client.models.calls[0]
-    assert call["model"] == "gemini-2.5-flash"
+    assert call["model"] == "gemini-3.8-flash"
     assert call["contents"] == "usuario"
     assert call["config"].response_mime_type == "application/json"
     assert call["config"].response_schema is Ping
@@ -139,7 +160,7 @@ def test_openai_compatible_request_and_usage() -> None:
     assert provider.complete_json("sistema", "usuario", Ping) == Ping(ok=True)
 
     call = client.completions.calls[0]
-    assert call["model"] == "meta/llama-3.3-70b-instruct"
+    assert call["model"] == "nvidia/nemotron-3.5-lightning-30b-a3b"
     assert call["response_format"] == {"type": "json_object"}
     assert call["messages"][0] == {"role": "system", "content": "sistema"}
     assert provider.last_usage is not None
@@ -217,6 +238,52 @@ def test_ollama_unavailable_when_service_does_not_answer() -> None:
     )
 
     assert provider.available() is False
+
+
+@pytest.mark.parametrize(
+    ("status_code", "detail"),
+    [
+        (501, "structured output is not supported by this model"),
+        (400, "response_format is not supported"),
+    ],
+)
+def test_openai_compatible_retries_without_response_format(status_code: int, detail: str) -> None:
+    client = FakeSequencedClient(
+        [FakeStatusError(status_code, detail), _reply('Claro: {"ok": true} fin')]
+    )
+    provider = OllamaProvider(_settings(), client=client)
+
+    assert provider.complete_json("s", "u", Ping) == Ping(ok=True)
+    assert len(client.completions.calls) == 2
+    assert "response_format" in client.completions.calls[0]
+    assert "response_format" not in client.completions.calls[1]
+    assert provider.last_usage is not None
+    assert provider.last_usage.completion_tokens == 5
+
+
+def test_openai_compatible_does_not_retry_unrelated_400() -> None:
+    client = FakeSequencedClient([FakeStatusError(400, "contexto demasiado largo")])
+    provider = GroqProvider(_settings(groq_api_key="clave-groq"), client=client)
+
+    with pytest.raises(ProviderUnavailableError) as info:
+        provider.complete_json("s", "u", Ping)
+
+    assert len(client.completions.calls) == 1
+    assert "contexto demasiado largo" in str(info.value)
+
+
+def test_ollama_errors_keep_the_provider_name_visible() -> None:
+    provider = OllamaProvider(
+        _settings(),
+        client=FakeOpenAIClient(FakeStatusError(500, "ollama: modelo no cargado")),
+    )
+
+    with pytest.raises(ProviderUnavailableError) as info:
+        provider.complete_json("s", "u", Ping)
+
+    message = str(info.value)
+    assert "ollama" in message
+    assert "***" not in message
 
 
 def test_parse_json_payload_accepts_markdown_fences_and_prose() -> None:

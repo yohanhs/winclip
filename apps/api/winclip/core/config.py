@@ -55,10 +55,10 @@ class Settings(BaseSettings):
     groq_api_key: SecretStr = SecretStr("")
     llm_provider_order: str = "gemini,nvidia,openrouter,groq,ollama"
     ollama_host: str = "http://localhost:11434"
-    gemini_model: str = "gemini-2.5-flash"
-    nvidia_model: str = "meta/llama-3.3-70b-instruct"
-    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
-    groq_model: str = "llama-3.3-70b-versatile"
+    gemini_model: str = "gemini-3.8-flash"
+    nvidia_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
+    openrouter_model: str = "nvidia/nemotron-3.5-lightning:free"
+    groq_model: str = "qwen/qwen3.8-27b"
     ollama_model: str = "qwen3.5:4b"
     llm_timeout_seconds: float = Field(default=60.0, gt=0)
     llm_max_retries_per_provider: int = Field(default=2, ge=0)

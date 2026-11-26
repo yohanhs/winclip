@@ -88,10 +88,10 @@ router de proveedores **gratuitos** los mejores clips. Los modelos por defecto s
 
 | Variable | Modelo por defecto |
 |---|---|
-| `GEMINI_MODEL` | `gemini-2.5-flash` |
-| `NVIDIA_MODEL` | `meta/llama-3.3-70b-instruct` |
-| `OPENROUTER_MODEL` | `meta-llama/llama-3.3-70b-instruct:free` |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` |
+| `GEMINI_MODEL` | `gemini-3.8-flash` |
+| `NVIDIA_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` |
+| `OPENROUTER_MODEL` | `nvidia/nemotron-3.5-lightning:free` |
+| `GROQ_MODEL` | `qwen/qwen3.8-27b` |
 | `OLLAMA_MODEL` | `qwen3.5:4b` |
 
 El orden lo define `LLM_PROVIDER_ORDER` (`gemini,nvidia,openrouter,groq,ollama`). Los proveedores sin
