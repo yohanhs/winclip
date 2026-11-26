@@ -25,6 +25,6 @@ class HealthOut(BaseModel):
     checks: list[CheckOut]
 
 
-@router.get("/health", response_model=HealthOut)
+@router.get("/health", response_model=HealthOut, operation_id="getHealth")
 def health() -> HealthOut:
     return HealthOut(**health_payload())  # type: ignore[arg-type]

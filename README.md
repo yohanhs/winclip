@@ -29,11 +29,15 @@ de YouTube, TikTok e Instagram ya configuradas.
 ```bash
 pnpm install                 # dependencias JS del monorepo
 cp .env.example .env         # configuración local (ignorada por git)
-pnpm dev                     # API en :8000 y web en :3000
+pnpm dev                     # API :8000 + worker + web :3000
 ```
 
+`pnpm dev` lanza tres procesos: `api` (uvicorn con recarga), `worker` (cola de trabajos) y `web`.
+La API y el worker aplican las migraciones de Alembic al arrancar y crean `workspace` por defecto.
+
 - Web: <http://localhost:3000> · Estado del sistema: <http://localhost:3000/settings/status>
-- API: <http://localhost:8000/api/health>
+- API: <http://localhost:8000/api/health> · OpenAPI: <http://localhost:8000/openapi.json>
+- Worker solo: `uv run --project apps/api winclip worker` · Migraciones: `winclip db upgrade`
 
 ## Diagnóstico
 
@@ -177,10 +181,37 @@ clips son idempotentes: la huella de parámetros se guarda en `.render.sha256` y
 ejecución reutiliza el clip salvo `--force` o cambio de preset. Un fallo a mitad de render no deja
 artefactos porque todo se escribe en un directorio temporal y se publica de forma atómica.
 
+## API, trabajos y eventos en tiempo real
+
+La API REST (`/api`) persiste proyectos, clips y trabajos en SQLite y expone la cola asíncrona que
+procesa el worker. Contrato completo en [`docs/api.md`](docs/api.md).
+
+```bash
+# crear un proyecto desde una URL (JSON) o desde un archivo (multipart streaming)
+curl -s -X POST http://127.0.0.1:8000/api/projects \
+  -H 'content-type: application/json' \
+  -d '{"source_url":"https://www.youtube.com/watch?v=...","requested_clips":5,"language":"es"}'
+
+# seguir el progreso en tiempo real
+curl -N 'http://127.0.0.1:8000/api/events?project_id=<id>'
+```
+
+- Proyectos: `POST/GET/DELETE /api/projects` y `GET /api/projects/{id}/clips`.
+- Clips: `PATCH/DELETE /api/clips/{id}`, `POST /api/clips/{id}/rerender` y entrega de MP4/JPEG con
+  `Range` y `206` en `/file` y `/thumb`.
+- Trabajos: `GET /api/jobs/{id}`, `POST /api/jobs/{id}/cancel` (`409` si ya terminó).
+- Presets: `GET /api/presets` lee `assets/subtitle-presets/*.json`.
+- SSE: `job.progress`, `job.done`, `job.failed`, `clip.ready` y `heartbeat`, con `Last-Event-ID`.
+
+La cola vive en la tabla `job`: un trabajo pesado a la vez (GPU/MLX/ffmpeg), concurrencia ligera
+configurable, reintentos con backoff, cancelación cooperativa y recuperación de huérfanos al
+reiniciar. `publish` está reservado para el change 8 y falla de forma controlada sin reintentos.
+
 ## Estructura
 
 ```
-apps/api/            FastAPI + CLI (Python 3.12, uv)
+apps/api/            FastAPI + CLI + worker (Python 3.12, uv)
+apps/api/alembic/    migraciones versionadas de SQLite (render_as_batch)
 apps/web/            Next.js 16 (App Router, Tailwind v4, shadcn/ui)
 packages/api-client/ cliente TypeScript (se generará desde OpenAPI)
 assets/fonts/        fuentes OFL con sus licencias
