@@ -12,7 +12,7 @@ de YouTube, TikTok e Instagram ya configuradas.
 ## Requisitos
 
 - macOS en Apple Silicon (objetivo: M1, 16 GB).
-- [Node.js](https://nodejs.org) 20+ y [pnpm](https://pnpm.io) 10+.
+- [Node.js](https://nodejs.org) 24+ (hay `.nvmrc` con `24`) y [pnpm](https://pnpm.io) 10+.
 - [uv](https://docs.astral.sh/uv/) (gestiona Python 3.12 automáticamente).
 - `ffmpeg-full` de Homebrew **con libass** (keg-only, no está en el `PATH`):
 
@@ -50,7 +50,7 @@ Las claves de API se muestran únicamente como `presente`/`ausente`, nunca su va
 
 ```
 apps/api/            FastAPI + CLI (Python 3.12, uv)
-apps/web/            Next.js 15 (App Router, Tailwind v4, shadcn/ui)
+apps/web/            Next.js 16 (App Router, Tailwind v4, shadcn/ui)
 packages/api-client/ cliente TypeScript (se generará desde OpenAPI)
 assets/fonts/        fuentes OFL con sus licencias
 docs/architecture.md arquitectura y contratos entre changes
