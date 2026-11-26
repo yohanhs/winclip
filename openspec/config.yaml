@@ -1,0 +1,80 @@
+schema: spec-driven
+
+context: |
+  Language: es
+  All artifacts must be written in es.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  ## Proyecto
+  WinClip (nombre de código; la marca comercial es configurable vía APP_NAME) es una app LOCAL
+  de "clipping": dado un video largo (URL o archivo) genera N shorts/reels verticales 9:16 con
+  subtítulos palabra-a-palabra, siguiendo las reglas de una campaña, los muestra como cards en
+  una web y los publica en cuentas de YouTube (principal), TikTok e Instagram previamente
+  configuradas (varias cuentas por red). Idiomas de contenido: español e inglés.
+  Uso actual: un solo usuario, sin login. Futuro: posible SaaS por suscripción -> diseñar con
+  capas limpias, interfaces para storage/LLM/publishers y entidad `workspace` desde el inicio.
+  Repo PÚBLICO en GitHub (yohanhs/winclip), licencia AGPL-3.0.
+
+  ## Stack (no cambiar sin un change de OpenSpec)
+  - Monorepo pnpm: apps/web (Next.js 15 App Router, TypeScript strict, Tailwind v4, shadcn/ui,
+    TanStack Query), apps/api (FastAPI, Python 3.12 gestionado con uv, SQLModel + SQLite,
+    pydantic-settings), packages/api-client (cliente TS generado desde OpenAPI).
+  - Jobs: cola persistente propia sobre SQLite, worker en proceso separado, un job GPU a la vez.
+    Progreso en tiempo real por SSE. No Redis, no Docker.
+  - Hardware objetivo: Apple Silicon M1 16 GB (macOS). Aprovechar MLX y h264_videotoolbox.
+
+  ## Herramientas locales (verificadas)
+  - FFMPEG_BIN=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg (keg-only, con libass/freetype/harfbuzz).
+    FFPROBE_BIN=/opt/homebrew/opt/ffmpeg-full/bin/ffprobe. NUNCA asumir `ffmpeg` del PATH
+    (el del PATH no tiene libass).
+  - yt-dlp (homebrew) y paquete python yt-dlp.
+  - mlx-whisper con modelo mlx-community/whisper-large-v3-turbo (ya en caché HF). Usar
+    word_timestamps=True.
+  - Ollama 0.40 con OLLAMA_MODELS=/Volumes/yohan/ollama-models (qwen3.5:4b, gemma4:e2b,
+    llama3.2:3b). Solo respaldo offline.
+  - Playwright + Chromium (instalar paquete python en el venv del proyecto).
+  - Trabajo previo reutilizable del autor (solo lectura, NO copiar secretos ni tokens):
+    /Volumes/yohan/Canales de YouTube/Dinero en Voz Baja/herramientas/subtitulos_quemar.py
+    (subtítulos karaoke con PIL), /Volumes/yohan/Canales de YouTube/HookVault/material_fuente/
+    herramientas/cortar_clip.sh (recorte 9:16), /Volumes/yohan/Youtube API/subir.py
+    (YouTube Data API v3) y subir_tiktok.py (TikTok Content Posting API).
+
+  ## LLM
+  Solo modelos GRATUITOS vía API detrás de un router con fallback y manejo de 429:
+  Gemini (Google AI Studio) -> NVIDIA NIM (integrate.api.nvidia.com/v1, OpenAI-compatible)
+  -> OpenRouter/Groq free (opcionales) -> Ollama local. Salidas siempre JSON validado con
+  Pydantic. Cachear respuestas por hash de entrada.
+
+  ## Reglas de seguridad (repo público)
+  - NUNCA commitear: .env, client_secret*.json, tokens, cookies, perfiles de Playwright,
+    storage/, media. Secretos solo vía .env / pydantic-settings. gitleaks en pre-commit y CI.
+  - Nunca imprimir secretos en logs ni en el doctor (solo "presente/ausente").
+  - Fuentes incluidas en el repo: solo licencias libres (OFL). Fuentes comerciales del usuario
+    (p. ej. Gotham) se cargan desde ~/Library/Fonts únicamente en local.
+
+  ## Convenciones
+  - Python: ruff (lint+format), type hints, pytest. Módulos del pipeline puros y testeables,
+    invocables tanto por CLI (`winclip ...`) como por el worker.
+  - TS: ESLint + Prettier, componentes en kebab-case, sin `any`.
+  - Rutas de datos: todo bajo STORAGE_DIR (default ./storage en el repo público; en la máquina
+    del autor se configura vía .env local a /Volumes/yohan/Proyectos/winclip/storage para no
+    llenar el SSD interno). DATABASE_URL por defecto apunta a {STORAGE_DIR}/winclip.db.
+    Estructura: {STORAGE_DIR}/projects/<project_id>/{source,audio,transcript,clips,thumbs}.
+  - Commits: Conventional Commits. Un change de OpenSpec = una rama `change/<nombre>`.
+  - Cada change termina con: tests verdes, `openspec validate --strict`, README actualizado.
+
+rules:
+  proposal:
+    - Indicar explícitamente qué queda fuera de alcance
+  tasks:
+    - Tareas pequeñas (máx ~2 h) y verificables, con el comando de verificación cuando aplique
+    - Incluir siempre una tarea final de verificación (tests + openspec validate)
+  design:
+    - Justificar cualquier dependencia nueva
+
+operations:
+  apply:
+    guidance:
+      - No cambiar el stack ni las rutas de herramientas fijadas en el contexto
+      - Si una tarea requiere secretos o login del usuario, pausar y pedirlo; nunca inventarlos
+      - Mantener resúmenes de tests concisos
