@@ -5,9 +5,9 @@ clipping: a partir de un vídeo largo (URL o archivo) genera cortes verticales 9
 palabra a palabra, siguiendo las reglas de una campaña, los revisa en una web y los publica en cuentas
 de YouTube, TikTok e Instagram ya configuradas.
 
-> Estado: **fundamentos e ingesta/transcripción (CLI)**. Este repositorio contiene el monorepo, la
-> configuración central, el diagnóstico del sistema, el esqueleto de la web y las dos primeras etapas
-> del pipeline. La selección, el render y la publicación llegan en los siguientes changes de OpenSpec.
+> Estado: **fundamentos, ingesta/transcripción y selección de clips (CLI)**. Este repositorio contiene
+> el monorepo, la configuración central, el diagnóstico del sistema, el esqueleto de la web y las tres
+> primeras etapas del pipeline. El render y la publicación llegan en los siguientes changes de OpenSpec.
 
 ## Requisitos
 
@@ -79,6 +79,61 @@ transcript/transcript.json  contrato `docs/architecture.md §6.1`
 
 Las pruebas lentas (`pytest -m slow`) ejecutan `mlx-whisper` real con el modelo `tiny` y solo corren en
 macOS arm64 con el modelo en caché de Hugging Face.
+
+## Selección de clips con LLM (CLI)
+
+`winclip select` lee `transcript/transcript.json`, segmenta la transcripción en frases y pide a un
+router de proveedores **gratuitos** los mejores clips. Los modelos por defecto son configurables en
+`.env` (véase `.env.example`):
+
+| Variable | Modelo por defecto |
+|---|---|
+| `GEMINI_MODEL` | `gemini-2.5-flash` |
+| `NVIDIA_MODEL` | `meta/llama-3.3-70b-instruct` |
+| `OPENROUTER_MODEL` | `meta-llama/llama-3.3-70b-instruct:free` |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` |
+| `OLLAMA_MODEL` | `qwen3.5:4b` |
+
+El orden lo define `LLM_PROVIDER_ORDER` (`gemini,nvidia,openrouter,groq,ollama`). Los proveedores sin
+clave (o sin servicio, como Ollama) se omiten; ante 429/5xx/timeouts hay backoff acotado y fallback, y
+una respuesta JSON inválida se autocorrige hasta dos veces antes de pasar al siguiente proveedor. Las
+respuestas válidas se cachean en `STORAGE_DIR/cache/llm/<sha256>.json` y la caché nunca contiene claves.
+
+```bash
+# comprobar qué proveedor responde (sale con código 1 si ninguno lo hace)
+uv run --project apps/api winclip llm test
+
+# seleccionar 5 clips y escribir selection/candidates.json
+uv run --project apps/api winclip select mi-proyecto --count 5
+
+# todos los clips que superen LLM_SCORE_THRESHOLD (60), aplicando reglas de campaña
+uv run --project apps/api winclip select mi-proyecto --count max --rules rules.json
+
+# ignorar la caché local de respuestas LLM
+uv run --project apps/api winclip select mi-proyecto --count 5 --no-cache
+```
+
+`rules.json` sigue el esquema de `docs/architecture.md §6.4` y todos sus campos son opcionales:
+
+```json
+{
+  "name": "mi-campana",
+  "language": "es",
+  "min_duration": 20,
+  "max_duration": 60,
+  "max_clips": 5,
+  "banned_words": ["estafa"],
+  "required_keywords": ["dinero"],
+  "tone": "directo",
+  "hashtags": ["#shorts", "#finanzas"]
+}
+```
+
+Post-procesado determinista: cortes ajustados a palabras reales de la transcripción, duración dentro
+del rango, descarte de candidatos con `banned_words`, aviso estructurado (`rule_violations`) si faltan
+`required_keywords`, ausencia de solapes y orden por `score` descendente. `--count max` exige además
+`score >= LLM_SCORE_THRESHOLD` y cero infracciones. El resultado queda en
+`STORAGE_DIR/projects/<project_id>/selection/candidates.json` (contrato §6.2).
 
 ## Estructura
 
