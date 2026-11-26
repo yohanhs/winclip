@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
+from pydantic import BaseModel
 from rich.console import Console
 from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
 from rich.table import Table
@@ -14,13 +16,17 @@ from winclip.core.config import get_settings
 from winclip.core.doctor import CheckResult, has_errors, run_checks
 from winclip.core.ids import InvalidProjectIdError
 from winclip.core.storage import StoragePathError
+from winclip.llm.router import LLMRouter
+from winclip.llm.types import LLMError, ProviderAttempt
 from winclip.pipeline.ingest import IngestError
 from winclip.pipeline.ingest import ingest as run_ingest
+from winclip.pipeline.select import SelectionError, select_clips
 from winclip.pipeline.transcribe import (
     SUPPORTED_LANGUAGES,
     TranscriptionError,
 )
 from winclip.pipeline.transcribe import transcribe as run_transcribe
+from winclip.rules.schema import RulesFileError
 
 app = typer.Typer(
     name="winclip",
@@ -28,6 +34,12 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+llm_app = typer.Typer(
+    help="Proveedores LLM gratuitos y prueba de conectividad del router.",
+    no_args_is_help=True,
+)
+app.add_typer(llm_app, name="llm")
 
 _STATUS_STYLE = {"ok": "green", "warn": "yellow", "error": "red"}
 _STATUS_LABEL = {"ok": "ok", "warn": "aviso", "error": "error"}
@@ -40,6 +52,23 @@ _STAGE_LABELS = {
     "transcribe": "transcribiendo",
     "save": "guardando",
 }
+_ATTEMPT_STYLE = {
+    "ok": ("ok", "green"),
+    "skipped": ("omitido", "yellow"),
+    "error": ("error", "red"),
+}
+
+
+class _LLMPing(BaseModel):
+    """Esquema mínimo para comprobar que el proveedor devuelve el JSON pedido."""
+
+    ok: bool
+    message: str
+
+
+def _build_llm_router() -> LLMRouter:
+    """Router real (los tests lo sustituyen por uno con proveedores falsos)."""
+    return LLMRouter(get_settings())
 
 
 def _progress_bar() -> Progress:
@@ -49,6 +78,25 @@ def _progress_bar() -> Progress:
         TaskProgressColumn(),
         transient=True,
     )
+
+
+def _print_attempts(console: Console, attempts: list[ProviderAttempt]) -> None:
+    table = Table(title="Intentos LLM", header_style="bold")
+    table.add_column("Proveedor", style="bold")
+    table.add_column("Modelo")
+    table.add_column("Estado")
+    table.add_column("Latencia")
+    table.add_column("Detalle", overflow="fold", style="dim")
+    for attempt in attempts:
+        label, style = _ATTEMPT_STYLE[attempt.status]
+        table.add_row(
+            attempt.provider,
+            attempt.model or "—",
+            f"[{style}]{label}[/{style}]",
+            f"{attempt.latency_ms} ms",
+            attempt.error or "",
+        )
+    console.print(table)
 
 
 def _print_doctor_table(console: Console, app_name: str, results: list[CheckResult]) -> None:
@@ -187,6 +235,94 @@ def transcribe_command(
         f"idioma: {result.transcript.language} · modelo: {result.transcript.model} · "
         f"segmentos: {len(result.transcript.segments)}"
     )
+
+
+@llm_app.command("test")
+def llm_test_command() -> None:
+    """Comprueba la conectividad LLM pidiendo un JSON mínimo al router."""
+    console = Console()
+    try:
+        result = _build_llm_router().complete_json(
+            "Responde siempre con un objeto JSON válido y sin texto adicional.",
+            'Devuelve exactamente un objeto JSON con "ok": true y "message": "pong".',
+            _LLMPing,
+            logical_model="llm-test:v1",
+            use_cache=False,
+        )
+    except LLMError as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        attempts = getattr(exc, "attempts", None)
+        if attempts:
+            _print_attempts(console, attempts)
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"[green]proveedor:[/green] {result.provider} · modelo: {result.model}")
+    console.print(f"respuesta: {result.data.message}")
+    console.print(
+        f"tokens aprox.: {result.prompt_tokens} entrada · {result.completion_tokens} salida"
+    )
+    _print_attempts(console, result.attempts)
+
+
+@app.command("select")
+def select_command(
+    project_id: Annotated[str, typer.Argument(help="Identificador del proyecto transcrito")],
+    count: Annotated[
+        str,
+        typer.Option("--count", help="Número de clips (entero >= 1) o 'max'"),
+    ] = "10",
+    rules: Annotated[
+        str | None,
+        typer.Option("--rules", help="Archivo JSON de reglas de campaña (§6.4)"),
+    ] = None,
+    no_cache: Annotated[
+        bool,
+        typer.Option("--no-cache", help="Ignora la caché local de respuestas LLM"),
+    ] = False,
+) -> None:
+    """Selecciona clips con el router LLM y escribe selection/candidates.json."""
+    console = Console()
+    try:
+        result = select_clips(
+            project_id,
+            count=count,
+            rules_path=Path(rules) if rules else None,
+            use_cache=not no_cache,
+            router_factory=_build_llm_router,
+        )
+    except (
+        SelectionError,
+        RulesFileError,
+        InvalidProjectIdError,
+        StoragePathError,
+        LLMError,
+    ) as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"[green]selección:[/green] {result.path}")
+    console.print(f"proveedor: {result.provider} · chunks: {result.chunks}")
+    if result.cached:
+        console.print("[yellow]respuesta desde caché[/yellow]")
+
+    candidates = result.document.candidates
+    if not candidates:
+        console.print("[yellow]sin candidatos válidos con los filtros aplicados[/yellow]")
+        return
+
+    table = Table(title="Candidatos", header_style="bold")
+    table.add_column("Score", justify="right")
+    table.add_column("Inicio", justify="right")
+    table.add_column("Duración", justify="right")
+    table.add_column("Título", overflow="fold")
+    for candidate in candidates:
+        table.add_row(
+            str(candidate.score),
+            f"{candidate.start:.1f}s",
+            f"{candidate.end - candidate.start:.1f}s",
+            candidate.title,
+        )
+    console.print(table)
 
 
 @app.command()
