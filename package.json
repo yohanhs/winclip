@@ -10,8 +10,9 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "dev": "concurrently --names api,web --prefix-colors cyan,magenta --kill-others-on-fail \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev": "concurrently --names api,worker,web --prefix-colors cyan,yellow,magenta --kill-others-on-fail \"pnpm run dev:api\" \"pnpm run dev:worker\" \"pnpm run dev:web\"",
     "dev:api": "uv run --project apps/api uvicorn winclip.main:app --reload --reload-dir apps/api --port ${API_PORT:-8000}",
+    "dev:worker": "uv run --project apps/api winclip worker",
     "dev:web": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "lint": "pnpm run lint:web && pnpm run lint:api",

@@ -42,3 +42,27 @@ def test_version_command() -> None:
 
     assert result.exit_code == 0
     assert result.output.strip() == "0.1.0"
+
+
+def test_db_upgrade_command_migrates_storage(cli_session) -> None:
+    result = runner.invoke(cli.app, ["db", "upgrade"])
+
+    assert result.exit_code == 0, result.output
+    assert (cli_session / "winclip.db").is_file()
+    assert "migraciones al día" in result.output
+
+
+def test_worker_and_db_commands_are_registered() -> None:
+    help_text = runner.invoke(cli.app, ["--help"]).output
+
+    assert "worker" in help_text
+    assert "db" in help_text
+
+    worker_help = runner.invoke(cli.app, ["worker", "--help"])
+    assert worker_help.exit_code == 0
+    assert "--light-concurrency" in worker_help.output
+    assert "--poll-interval" in worker_help.output
+
+    db_help = runner.invoke(cli.app, ["db", "--help"])
+    assert db_help.exit_code == 0
+    assert "upgrade" in db_help.output

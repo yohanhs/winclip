@@ -13,6 +13,7 @@ from rich.table import Table
 
 from winclip import __version__
 from winclip.core.config import get_settings
+from winclip.core.db import init_db
 from winclip.core.doctor import CheckResult, has_errors, run_checks
 from winclip.core.ids import InvalidProjectIdError
 from winclip.core.storage import StoragePathError
@@ -29,6 +30,7 @@ from winclip.pipeline.transcribe import (
 )
 from winclip.pipeline.transcribe import transcribe as run_transcribe
 from winclip.rules.schema import RulesFileError
+from winclip.worker.runner import run_worker
 
 app = typer.Typer(
     name="winclip",
@@ -42,6 +44,12 @@ llm_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(llm_app, name="llm")
+
+db_app = typer.Typer(
+    help="Migraciones de la base de datos (Alembic).",
+    no_args_is_help=True,
+)
+app.add_typer(db_app, name="db")
 
 _STATUS_STYLE = {"ok": "green", "warn": "yellow", "error": "red"}
 _STATUS_LABEL = {"ok": "ok", "warn": "aviso", "error": "error"}
@@ -450,6 +458,51 @@ def render_command(
             str(clips_dir / manifest.clip_id),
         )
     console.print(table)
+
+
+@db_app.command("upgrade")
+def db_upgrade() -> None:
+    """Aplica las migraciones pendientes y garantiza el workspace por defecto."""
+    settings = get_settings()
+    console = Console()
+    try:
+        init_db(settings)
+    except Exception as exc:
+        console.print(f"[red]error:[/red] no se pudo migrar la base de datos: {exc}")
+        raise typer.Exit(code=1) from exc
+    console.print(f"[green]base de datos:[/green] {settings.database_url}")
+    console.print("migraciones al día (head)")
+
+
+@app.command("worker")
+def worker_command(
+    light_concurrency: Annotated[
+        int | None,
+        typer.Option("--light-concurrency", help="Trabajos ligeros simultáneos"),
+    ] = None,
+    poll_interval: Annotated[
+        float | None,
+        typer.Option("--poll-interval", help="Segundos entre sondeos de la cola"),
+    ] = None,
+) -> None:
+    """Procesa la cola de trabajos en un proceso aparte (SIGINT/SIGTERM limpios)."""
+    settings = get_settings()
+    updates: dict[str, object] = {}
+    if light_concurrency is not None:
+        updates["worker_light_concurrency"] = light_concurrency
+    if poll_interval is not None:
+        updates["worker_poll_interval"] = poll_interval
+    if updates:
+        settings = settings.model_copy(update=updates)
+
+    console = Console()
+    engine = init_db(settings)
+    console.print(
+        f"[green]worker[/green] base de datos: {settings.database_url} · "
+        f"ligeros={settings.worker_light_concurrency} · pesados=1 a la vez"
+    )
+    runner = run_worker(engine, settings)
+    console.print(f"worker detenido ({runner.worker_id})")
 
 
 @app.command()
