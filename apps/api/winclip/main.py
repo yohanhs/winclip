@@ -20,8 +20,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
+            f"http://localhost:{settings.web_port}",
+            f"http://127.0.0.1:{settings.web_port}",
         ],
         allow_credentials=False,
         allow_methods=["GET"],

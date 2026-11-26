@@ -17,19 +17,19 @@
 
 ## 3. Frontend base (apps/web)
 
-- [ ] 3.1 Crear la app Next.js 15 (TypeScript strict, App Router, Tailwind v4, ESLint) en `apps/web`, inicializar shadcn/ui y añadir @tanstack/react-query con un provider. Verificar que `pnpm --filter web build` termina sin errores.
-- [ ] 3.2 Construir el layout con sidebar (Proyectos, Campañas, Cuentas, Publicaciones, Ajustes) y páginas placeholder, usando `APP_NAME` desde `NEXT_PUBLIC_APP_NAME`. Verificar navegando las 5 rutas con `pnpm --filter web dev`.
-- [ ] 3.3 Crear la página `/settings/status` que consume `GET /api/health`: badge por check, detalle y hint, más el aviso "API no disponible" con el comando para arrancarla. Verificar manualmente con la API arriba y abajo y dejar captura en la PR.
-- [ ] 3.4 Crear `packages/api-client` con un `package.json` y README que explique que se generará desde OpenAPI en el change 5. Verificar que `pnpm install` lo reconoce como workspace.
+- [x] 3.1 Crear la app Next.js 15 (TypeScript strict, App Router, Tailwind v4, ESLint) en `apps/web`, inicializar shadcn/ui y añadir @tanstack/react-query con un provider. Verificar que `pnpm --filter web build` termina sin errores.
+- [x] 3.2 Construir el layout con sidebar (Proyectos, Campañas, Cuentas, Publicaciones, Ajustes) y páginas placeholder, usando `APP_NAME` desde `NEXT_PUBLIC_APP_NAME`. Verificar navegando las 5 rutas con `pnpm --filter web dev`.
+- [x] 3.3 Crear la página `/settings/status` que consume `GET /api/health`: badge por check, detalle y hint, más el aviso "API no disponible" con el comando para arrancarla. Verificar manualmente con la API arriba y abajo y dejar captura en la PR.
+- [x] 3.4 Crear `packages/api-client` con un `package.json` y README que explique que se generará desde OpenAPI en el change 5. Verificar que `pnpm install` lo reconoce como workspace.
 
 ## 4. Assets y CI
 
-- [ ] 4.1 Descargar las fuentes OFL (Montserrat, Poppins, Anton, Bebas Neue, League Spartan, Inter) en `assets/fonts/<familia>/` con su `OFL.txt`. Verificar que cada carpeta tiene su licencia.
-- [ ] 4.2 Crear `.github/workflows/ci.yml` con los jobs gitleaks, api (uv sync, ruff check, ruff format --check, pytest) y web (pnpm install --frozen-lockfile, lint, build). Verificar la sintaxis con `actionlint` si está disponible, o revisión manual.
+- [x] 4.1 Descargar las fuentes OFL (Montserrat, Poppins, Anton, Bebas Neue, League Spartan, Inter) en `assets/fonts/<familia>/` con su `OFL.txt`. Verificar que cada carpeta tiene su licencia.
+- [x] 4.2 Crear `.github/workflows/ci.yml` con los jobs gitleaks, api (uv sync, ruff check, ruff format --check, pytest) y web (pnpm install --frozen-lockfile, lint, build). Verificar la sintaxis con `actionlint` si está disponible, o revisión manual.
 
 ## 5. Verificación integrada
 
-- [ ] 5.1 Ejecutar `pnpm dev` y comprobar que API (8000) y web (3000) responden y que `/settings/status` muestra los checks en verde (warn aceptable en Ollama y Playwright). Ejecutar `openspec validate setup-foundation --strict` sin errores.
+- [x] 5.1 Ejecutar `pnpm dev` y comprobar que API (8000) y web (3000) responden y que `/settings/status` muestra los checks en verde (warn aceptable en Ollama y Playwright). Ejecutar `openspec validate setup-foundation --strict` sin errores.
 
 ## Workflow follow-up
 
