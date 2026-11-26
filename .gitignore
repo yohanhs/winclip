@@ -41,6 +41,10 @@ storage-*/
 !assets/subtitle-presets/*.json
 !apps/api/tests/fixtures/golden/*.ass
 
+# Test results and reports
+playwright-report/
+test-results/
+
 # Node / pnpm
 node_modules/
 .pnpm-store/

@@ -21,6 +21,7 @@
     "test": "pnpm run test:api && pnpm run typecheck:web",
     "test:api": "uv run --project apps/api pytest apps/api/tests",
     "typecheck:web": "pnpm --filter web typecheck",
+    "gen:api": "pnpm --filter @winclip/api-client gen",
     "doctor": "uv run --project apps/api winclip doctor"
   },
   "devDependencies": {

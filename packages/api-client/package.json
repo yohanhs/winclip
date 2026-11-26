@@ -1,13 +1,29 @@
 {
   "name": "@winclip/api-client",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "Cliente TypeScript de la API de WinClip (generado desde OpenAPI en add-web-ui-cards)",
+  "description": "Cliente TypeScript tipado de la API de WinClip generado desde OpenAPI",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": ["src"]
+  "files": [
+    "src",
+    "openapi.snapshot.json"
+  ],
+  "scripts": {
+    "gen": "uv run --project ../../apps/api python -c \"import json; from winclip.main import app; print(json.dumps(app.openapi()))\" > openapi.snapshot.json && openapi-typescript openapi.snapshot.json -o src/schema.d.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.4"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.11",
+    "openapi-typescript": "^7.5.1",
+    "typescript": "5.9.3"
+  }
 }
