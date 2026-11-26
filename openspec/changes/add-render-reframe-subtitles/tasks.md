@@ -2,9 +2,9 @@
 
 ## 1. Dependencias, assets y contratos base
 
-- [ ] 1.1 Añadir `opencv-python-headless`, `pillow` y `numpy` en `apps/api/pyproject.toml` y sincronizar con `uv sync`. Verificar con `uv run --project apps/api python -c "import cv2, PIL, numpy; print(cv2.__version__)"`.
-- [ ] 1.2 Descargar la fuente OFL `Noto Color Emoji` con su `OFL.txt` en `assets/fonts/NotoColorEmoji/` y crear los 4 presets JSON (`bold-yellow.json`, `hormozi.json`, `clean-white.json`, `mrbeast.json`) en `assets/subtitle-presets/`. Verificar que `assets/fonts/NotoColorEmoji/OFL.txt` existe y que los 4 JSON son válidos con `uv run --project apps/api python -m json.tool`.
-- [ ] 1.3 Crear `apps/api/winclip/pipeline/render_models.py` con los modelos Pydantic `RenderManifest` (exacto a `docs/architecture.md §6.3`), `ReframeResult`, `SubtitleSummary`, `RenderOptions` y el dataclass `RenderProgress`, más tests unitarios de serialización/validación en `apps/api/tests/test_render_models.py`. Verificar con `uv run --project apps/api pytest tests/test_render_models.py`.
+- [x] 1.1 Añadir `opencv-python-headless`, `pillow` y `numpy` en `apps/api/pyproject.toml` y sincronizar con `uv sync`. Verificar con `uv run --project apps/api python -c "import cv2, PIL, numpy; print(cv2.__version__)"`.
+- [x] 1.2 Descargar la fuente OFL `Noto Color Emoji` con su `OFL.txt` en `assets/fonts/NotoColorEmoji/` y crear los 4 presets JSON (`bold-yellow.json`, `hormozi.json`, `clean-white.json`, `mrbeast.json`) en `assets/subtitle-presets/`. Verificar que `assets/fonts/NotoColorEmoji/OFL.txt` existe y que los 4 JSON son válidos con `uv run --project apps/api python -m json.tool`.
+- [x] 1.3 Crear `apps/api/winclip/pipeline/render_models.py` con los modelos Pydantic `RenderManifest` (exacto a `docs/architecture.md §6.3`), `ReframeResult`, `SubtitleSummary`, `RenderOptions` y el dataclass `RenderProgress`, más tests unitarios de serialización/validación en `apps/api/tests/test_render_models.py`. Verificar con `uv run --project apps/api pytest tests/test_render_models.py`.
 
 ## 2. Reencuadre vertical (`vertical-reframe`)
 

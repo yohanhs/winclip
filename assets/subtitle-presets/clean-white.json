@@ -1,0 +1,22 @@
+{
+  "name": "clean-white",
+  "description": "Estilo limpio con caja semitransparente y palabra activa azul",
+  "font": "Poppins Bold",
+  "fallback_font": "Poppins Bold",
+  "font_size": 64,
+  "uppercase": false,
+  "primary_color": "#FFFFFF",
+  "highlight_color": "#38BDF8",
+  "outline_color": "#000000",
+  "outline_width": 3,
+  "shadow_color": "#000000",
+  "shadow_depth": 2,
+  "highlight_scale_pct": 108,
+  "y_pct": 0.68,
+  "margin_x": 100,
+  "max_lines": 2,
+  "max_chars_per_line": 32,
+  "max_words_per_cue": 6,
+  "max_pause_sec": 0.6,
+  "box_bg_color": "#00000088"
+}

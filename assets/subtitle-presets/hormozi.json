@@ -1,0 +1,22 @@
+{
+  "name": "hormozi",
+  "description": "Estilo Hormozi: mayúsculas, bloques de tres palabras y palabra activa amarilla",
+  "font": "Montserrat Black",
+  "fallback_font": "Montserrat ExtraBold",
+  "font_size": 84,
+  "uppercase": true,
+  "primary_color": "#FFFFFF",
+  "highlight_color": "#FFE500",
+  "outline_color": "#000000",
+  "outline_width": 8,
+  "shadow_color": "#000000",
+  "shadow_depth": 4,
+  "highlight_scale_pct": 118,
+  "y_pct": 0.64,
+  "margin_x": 80,
+  "max_lines": 2,
+  "max_chars_per_line": 20,
+  "max_words_per_cue": 3,
+  "max_pause_sec": 0.5,
+  "box_bg_color": null
+}

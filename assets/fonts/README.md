@@ -11,6 +11,7 @@ conserva su `OFL.txt`, descargado del repositorio oficial [google/fonts](https:/
 | Bebas Neue | Regular | Condensada para hooks |
 | League Spartan | Bold, Black | Estilo MrBeast |
 | Inter | Regular, SemiBold, Bold | Texto y UI |
+| Noto Color Emoji | Regular | Emojis en subtítulos (CBDT) |
 
 ## Fuentes comerciales
 
