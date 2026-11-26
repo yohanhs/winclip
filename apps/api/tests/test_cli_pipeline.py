@@ -19,6 +19,9 @@ runner = CliRunner()
 class FakeMlxBackend:
     """Sustituye a `MlxWhisperBackend` en la CLI para no usar MLX."""
 
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
     def transcribe(self, _audio_path: Path, *, model: str, language: str | None):
         return RawTranscription(
             language="es",
