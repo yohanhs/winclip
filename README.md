@@ -5,9 +5,9 @@ clipping: a partir de un vídeo largo (URL o archivo) genera cortes verticales 9
 palabra a palabra, siguiendo las reglas de una campaña, los revisa en una web y los publica en cuentas
 de YouTube, TikTok e Instagram ya configuradas.
 
-> Estado: **fundamentos**. Este repositorio contiene el monorepo, la configuración central, el
-> diagnóstico del sistema y el esqueleto de la web. El pipeline (ingesta, transcripción, selección,
-> render y publicación) llega en los siguientes changes de OpenSpec.
+> Estado: **fundamentos e ingesta/transcripción (CLI)**. Este repositorio contiene el monorepo, la
+> configuración central, el diagnóstico del sistema, el esqueleto de la web y las dos primeras etapas
+> del pipeline. La selección, el render y la publicación llegan en los siguientes changes de OpenSpec.
 
 ## Requisitos
 
@@ -45,6 +45,40 @@ Comprueba ffmpeg-full (filtros `ass` y `subtitles`), ffprobe, yt-dlp, el modelo 
 Hugging Face, Ollama, Chromium de Playwright, el volumen externo y que `STORAGE_DIR` sea escribible.
 Los servicios opcionales solo generan `warn`; un `error` hace que el comando termine con código 1.
 Las claves de API se muestran únicamente como `presente`/`ausente`, nunca su valor.
+
+## Pipeline: ingesta y transcripción (CLI)
+
+Los changes 1–3 se validan solo por CLI antes de construir la API y la web.
+
+```bash
+# URL remota (mejor MP4 <= 1080p) o archivo local (.mp4, .mov, .mkv, .webm)
+uv run --project apps/api winclip ingest "https://www.youtube.com/watch?v=..."
+uv run --project apps/api winclip ingest /ruta/video.mov --project-id mi-proyecto
+
+# transcripción local con timestamps por palabra
+uv run --project apps/api winclip transcribe mi-proyecto --language es
+uv run --project apps/api winclip transcribe mi-proyecto --model tiny --force
+```
+
+- `ingest [--project-id <id>] [--force]`: descarga o copia el video, inspecciona con `FFPROBE_BIN`
+  (`source/meta.json`) y extrae `audio/audio16k.wav` (WAV PCM mono 16 kHz) con `FFMPEG_BIN`.
+  `--project-id` acepta `[a-z0-9_-]` (2–64 caracteres); si se omite se genera un ULID en minúsculas.
+  Sin `--force` un proyecto ya ingestado se rechaza para no sobrescribirlo.
+- `transcribe [--language es|en|auto] [--model <repo|tiny>] [--force]`: transcribe en local con
+  `mlx-whisper` (`word_timestamps=True`). Por defecto usa `WHISPER_MODEL` y autodetecta el idioma.
+  Reutiliza `transcript/transcript.json` si ya es válido salvo con `--force`.
+
+Cada proyecto queda aislado bajo `STORAGE_DIR/projects/<project_id>/`:
+
+```
+source/original.<ext>       video descargado o copiado (el original no se modifica)
+source/meta.json            metadatos de ffprobe y de yt-dlp
+audio/audio16k.wav          audio normalizado mono 16 kHz
+transcript/transcript.json  contrato `docs/architecture.md §6.1`
+```
+
+Las pruebas lentas (`pytest -m slow`) ejecutan `mlx-whisper` real con el modelo `tiny` y solo corren en
+macOS arm64 con el modelo en caché de Hugging Face.
 
 ## Estructura
 
