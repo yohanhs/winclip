@@ -2,7 +2,7 @@
 
 ## Context
 
-Ver `proposal.md` para la motivación. Este change depende de `add-api-jobs` (base de datos SQLite/SQLModel, estructura de routers FastAPI, workspace por defecto) y para su interfaz web de `add-web-ui-cards` (layout, navegación, cliente generado `packages/api-client`).
+Ver `proposal.md` para la motivación. Este change depende de `add-api-jobs` (base de datos SQLite/SQLModel, estructura de routers FastAPI, workspace por defecto) y para su interfaz web de `add-web-ui-cards` (layout, navegación, cliente generado `packages/api-client`) siguiendo el sistema visual aprobado en `docs/ui-design.md`.
 
 `docs/architecture.md` fija:
 - Variables de entorno (§4): `GOOGLE_CLIENT_SECRET_FILE`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `META_APP_ID`, `META_APP_SECRET`.

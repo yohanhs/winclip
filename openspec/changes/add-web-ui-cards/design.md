@@ -2,7 +2,7 @@
 
 ## Context
 
-`setup-foundation` dejó `apps/web` (Next.js 16 App Router, TypeScript strict, Tailwind v4, shadcn/ui, TanStack Query) con el layout base, sidebar y `packages/api-client` vacío. `add-api-jobs` entrega la API REST bajo `/api`, el stream SSE en `/api/events` y un esquema OpenAPI con `operationId` estables. Véase `proposal.md` para la motivación y el alcance.
+`setup-foundation` dejó `apps/web` (Next.js 16 App Router, TypeScript strict, Tailwind v4, shadcn/ui, TanStack Query) con el layout base, sidebar y `packages/api-client` vacío. `add-api-jobs` entrega la API REST bajo `/api`, el stream SSE en `/api/events` y un esquema OpenAPI con `operationId` estables. La estética visual, tokens, layout y componentes aprobados por el usuario están definidos en `docs/ui-design.md`. Véase `proposal.md` para la motivación y el alcance.
 
 ## Goals / Non-Goals
 

@@ -4,7 +4,7 @@
 
 Ver `proposal.md` para la motivación. Este change depende de `add-clip-selection-llm` (router LLM + `pipeline/select.py`), `add-render-reframe-subtitles` (`pipeline/render.py` + presets de subtítulos), `add-api-jobs` (SQLModel, cola de jobs, routers REST) y `add-web-ui-cards` (UI de `/projects/new` y tarjetas de clips en `/projects/[id]`).
 
-`docs/architecture.md` ya fija el esquema de campos de reglas (§6.4), la tabla `campaign` (§7), la ubicación de módulos (`winclip/rules/{schema,parser,validator}.py` y `winclip/routers/campaigns.py`, §3) y el campo `rule_violations` en `candidates.json` (§6.2).
+`docs/architecture.md` ya fija el esquema de campos de reglas (§6.4), la tabla `campaign` (§7), la ubicación de módulos (`winclip/rules/{schema,parser,validator}.py` y `winclip/routers/campaigns.py`, §3) y el campo `rule_violations` en `candidates.json` (§6.2). La UI de `/campaigns` sigue la referencia visual aprobada en `docs/ui-design.md`.
 
 ## Goals / Non-Goals
 

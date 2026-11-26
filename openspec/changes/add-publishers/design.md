@@ -2,7 +2,7 @@
 
 ## Context
 
-Ver `proposal.md` para la motivación. Este change depende de `add-campaign-rules` (metadatos de campaña: CTA, hashtags, idioma, plataformas objetivo) y `add-social-accounts` (entidad `social_account`, credenciales OAuth cifradas con refresco automático y perfiles persistentes Playwright).
+Ver `proposal.md` para la motivación. Este change depende de `add-campaign-rules` (metadatos de campaña: CTA, hashtags, idioma, plataformas objetivo) y `add-social-accounts` (entidad `social_account`, credenciales OAuth cifradas con refresco automático y perfiles persistentes Playwright). La UI de `/publications` y el diálogo `PublishDialog` siguen `docs/ui-design.md`.
 
 `docs/architecture.md` fija:
 - Estructura de módulos (§3): `winclip/publishers/{base,youtube_api,tiktok_api,instagram_graph}.py`, `winclip/publishers/playwright/{session,tiktok,instagram}.py` y `winclip/routers/publications.py`.
