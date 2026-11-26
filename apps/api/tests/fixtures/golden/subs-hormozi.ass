@@ -1,0 +1,25 @@
+[Script Info]
+; WinClip · preset hormozi · Estilo Hormozi: mayúsculas, bloques de tres palabras y palabra activa amarilla
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: WinClip,Montserrat Thin Black,84,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,8,4,2,80,80,614,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.50,0:00:00.90,WinClip,,0,0,0,,{\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}HOLA{\c&H00FFFFFF&\fscx100\fscy100} A TODOS,
+Dialogue: 0,0:00:00.90,0:00:01.10,WinClip,,0,0,0,,HOLA {\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}A{\c&H00FFFFFF&\fscx100\fscy100} TODOS,
+Dialogue: 0,0:00:01.10,0:00:01.70,WinClip,,0,0,0,,HOLA A {\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}TODOS,{\c&H00FFFFFF&\fscx100\fscy100}
+Dialogue: 0,0:00:01.70,0:00:02.20,WinClip,,0,0,0,,{\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}ESTO{\c&H00FFFFFF&\fscx100\fscy100} ES WINCLIP.
+Dialogue: 0,0:00:02.20,0:00:02.40,WinClip,,0,0,0,,ESTO {\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}ES{\c&H00FFFFFF&\fscx100\fscy100} WINCLIP.
+Dialogue: 0,0:00:02.40,0:00:03.20,WinClip,,0,0,0,,ESTO ES {\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}WINCLIP.{\c&H00FFFFFF&\fscx100\fscy100}
+Dialogue: 0,0:00:03.60,0:00:04.00,WinClip,,0,0,0,,{\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}VAMOS{\c&H00FFFFFF&\fscx100\fscy100} A POR
+Dialogue: 0,0:00:04.00,0:00:04.10,WinClip,,0,0,0,,VAMOS {\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}A{\c&H00FFFFFF&\fscx100\fscy100} POR
+Dialogue: 0,0:00:04.10,0:00:04.40,WinClip,,0,0,0,,VAMOS A {\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}POR{\c&H00FFFFFF&\fscx100\fscy100}
+Dialogue: 0,0:00:04.40,0:00:05.20,WinClip,,0,0,0,,{\c&H0000E5FF&\fscx118\fscy118\t(0,80,\fscx100\fscy100)}ELLO.{\c&H00FFFFFF&\fscx100\fscy100}
