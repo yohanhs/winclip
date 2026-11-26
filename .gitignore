@@ -39,6 +39,7 @@ storage-*/
 *.srt
 *.vtt
 !assets/subtitle-presets/*.json
+!apps/api/tests/fixtures/golden/*.ass
 
 # Node / pnpm
 node_modules/

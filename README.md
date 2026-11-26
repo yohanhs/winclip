@@ -135,6 +135,48 @@ del rango, descarte de candidatos con `banned_words`, aviso estructurado (`rule_
 `score >= LLM_SCORE_THRESHOLD` y cero infracciones. El resultado queda en
 `STORAGE_DIR/projects/<project_id>/selection/candidates.json` (contrato §6.2).
 
+## Render de clips verticales (CLI)
+
+`winclip render` toma los candidatos de `selection/candidates.json` y produce en
+`STORAGE_DIR/projects/<project_id>/clips/<clip_id>/` exactamente `clip.mp4` (1080x1920),
+`thumb.jpg`, `subs.ass` y `render.json` (contrato §6.3). El vídeo se codifica con
+`h264_videotoolbox` en Apple Silicon y cae automáticamente a `libx264` cuando el binario no
+lo soporta (Linux/CI); el audio va a AAC 192 kbps con `loudnorm` a `-14 LUFS`.
+
+```bash
+# un candidato concreto
+uv run --project apps/api winclip render mi-proyecto --clip 01jcand --preset bold-yellow
+
+# todos los candidatos con otro preset y el motor PIL
+uv run --project apps/api winclip render mi-proyecto --all --preset hormozi --engine pil
+
+# reencuadre manual con zoom y sin hook
+uv run --project apps/api winclip render mi-proyecto --clip 01jcand --reframe center \
+  --crop-x-pct 30 --zoom-pct 125 --no-hook-overlay
+```
+
+| Opción | Valores | Descripción |
+|---|---|---|
+| `--clip <id>` / `--all` | uno de los dos | candidato a renderizar o todos |
+| `--preset` | `bold-yellow`, `hormozi`, `clean-white`, `mrbeast` | estilo de subtítulos |
+| `--reframe` | `face`, `center`, `blur` | seguimiento facial, recorte manual o fondo desenfocado |
+| `--engine` | `ass` (libass, por defecto), `pil` | motor de subtítulos |
+| `--font` | nombre de fuente | p. ej. `GothamBlack` desde `USER_FONTS_DIR` |
+| `--crop-x-pct`, `--crop-y-pct`, `--zoom-pct` | `0-100`, `100-300` | ajustes del modo `center` |
+| `--hook-overlay` / `--no-hook-overlay`, `--hook-seconds` | `0.5-10` | tarjeta del hook al inicio |
+| `--watermark <png>` | ruta | marca de agua en la esquina superior derecha |
+| `--force` | — | vuelve a renderizar aunque la huella coincida |
+
+Presets en `assets/subtitle-presets/*.json` (tipografía, colores, contorno, zona segura y
+agrupación). Las fuentes OFL viven en `assets/fonts/` (incluida `Noto Color Emoji`); si se pide
+una fuente que no existe, se avisa y se usa la fuente OFL de respaldo del preset.
+
+El reencuadre `face` descarga una sola vez `face_detection_yunet_2023mar.onnx` en
+`STORAGE_DIR/models/` con verificación SHA-256; sin red, usa `--reframe center` o `blur`. Los
+clips son idempotentes: la huella de parámetros se guarda en `.render.sha256` y una segunda
+ejecución reutiliza el clip salvo `--force` o cambio de preset. Un fallo a mitad de render no deja
+artefactos porque todo se escribe en un directorio temporal y se publica de forma atómica.
+
 ## Estructura
 
 ```

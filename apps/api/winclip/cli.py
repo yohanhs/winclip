@@ -20,6 +20,8 @@ from winclip.llm.router import LLMRouter
 from winclip.llm.types import LLMError, ProviderAttempt
 from winclip.pipeline.ingest import IngestError
 from winclip.pipeline.ingest import ingest as run_ingest
+from winclip.pipeline.render import RenderError, render_project_clips
+from winclip.pipeline.render_models import RenderOptions, RenderProgress
 from winclip.pipeline.select import SelectionError, select_clips
 from winclip.pipeline.transcribe import (
     SUPPORTED_LANGUAGES,
@@ -51,6 +53,10 @@ _STAGE_LABELS = {
     "load_model": "cargando modelo",
     "transcribe": "transcribiendo",
     "save": "guardando",
+    "reframe": "reencuadrando",
+    "subtitles": "subtitulando",
+    "encode": "codificando",
+    "thumbnail": "miniatura",
 }
 _ATTEMPT_STYLE = {
     "ok": ("ok", "green"),
@@ -321,6 +327,127 @@ def select_command(
             f"{candidate.start:.1f}s",
             f"{candidate.end - candidate.start:.1f}s",
             candidate.title,
+        )
+    console.print(table)
+
+
+@app.command("render")
+def render_command(
+    project_id: Annotated[str, typer.Argument(help="Identificador del proyecto seleccionado")],
+    clip: Annotated[
+        str | None,
+        typer.Option("--clip", help="Identificador del candidato a renderizar"),
+    ] = None,
+    all_clips: Annotated[
+        bool,
+        typer.Option("--all", help="Renderiza todos los candidatos del proyecto"),
+    ] = False,
+    preset: Annotated[
+        str,
+        typer.Option("--preset", help="Preset de subtítulos (bold-yellow, hormozi, …)"),
+    ] = "bold-yellow",
+    reframe: Annotated[
+        str,
+        typer.Option("--reframe", help="Modo de reencuadre: face, center o blur"),
+    ] = "face",
+    engine: Annotated[
+        str,
+        typer.Option("--engine", help="Motor de subtítulos: ass (libass) o pil"),
+    ] = "ass",
+    font: Annotated[
+        str | None,
+        typer.Option("--font", help="Fuente a usar (local en USER_FONTS_DIR o OFL)"),
+    ] = None,
+    crop_x_pct: Annotated[
+        float,
+        typer.Option("--crop-x-pct", help="Centro horizontal del recorte en modo center (0-100)"),
+    ] = 50.0,
+    crop_y_pct: Annotated[
+        float,
+        typer.Option("--crop-y-pct", help="Centro vertical del recorte en modo center (0-100)"),
+    ] = 50.0,
+    zoom_pct: Annotated[
+        float,
+        typer.Option("--zoom-pct", help="Zoom del recorte en modo center (100-300)"),
+    ] = 100.0,
+    hook_overlay: Annotated[
+        bool,
+        typer.Option("--hook-overlay/--no-hook-overlay", help="Superpone el hook del candidato"),
+    ] = True,
+    hook_seconds: Annotated[
+        float,
+        typer.Option("--hook-seconds", help="Segundos que el hook permanece visible"),
+    ] = 3.0,
+    watermark: Annotated[
+        str | None,
+        typer.Option("--watermark", help="PNG de marca de agua (esquina superior derecha)"),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Vuelve a renderizar aunque el clip esté vigente"),
+    ] = False,
+) -> None:
+    """Renderiza clips verticales 9:16 con subtítulos, hook y miniatura."""
+    settings = get_settings()
+    console = Console()
+    try:
+        options = RenderOptions(
+            preset=preset,
+            reframe=reframe,
+            engine=engine,
+            font=font,
+            crop_x_pct=crop_x_pct,
+            crop_y_pct=crop_y_pct,
+            zoom_pct=zoom_pct,
+            hook_overlay=hook_overlay,
+            hook_seconds=hook_seconds,
+            watermark_path=Path(watermark) if watermark else None,
+            force=force,
+        )
+    except ValueError as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    progress_ui = _progress_bar()
+    try:
+        with progress_ui:
+            task_id = progress_ui.add_task("preparando", total=100)
+
+            def on_progress(value: RenderProgress) -> None:
+                progress_ui.update(
+                    task_id,
+                    completed=min(100.0, max(0.0, value.percent)),
+                    description=f"{_STAGE_LABELS.get(value.stage, value.stage)}: {value.message}",
+                )
+
+            manifests = render_project_clips(
+                project_id,
+                options=options,
+                all_clips=all_clips,
+                candidate_ids=[clip] if clip else None,
+                settings=settings,
+                on_progress=on_progress,
+            )
+    except (RenderError, InvalidProjectIdError, StoragePathError, ValueError) as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="Clips renderizados", header_style="bold")
+    table.add_column("Clip", style="bold")
+    table.add_column("Candidato")
+    table.add_column("Duración", justify="right")
+    table.add_column("Reencuadre")
+    table.add_column("Subtítulos")
+    table.add_column("Ruta", overflow="fold")
+    clips_dir = settings.storage_dir / "projects" / project_id / "clips"
+    for manifest in manifests:
+        table.add_row(
+            manifest.clip_id,
+            manifest.candidate_id,
+            f"{manifest.duration:.1f}s",
+            manifest.reframe.mode,
+            f"{manifest.subtitles.engine} · {manifest.subtitles.preset}",
+            str(clips_dir / manifest.clip_id),
         )
     console.print(table)
 
