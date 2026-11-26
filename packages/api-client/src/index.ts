@@ -3,8 +3,8 @@
  * Generado automáticamente con `pnpm gen:api` desde el esquema OpenAPI de la API
  */
 
-export { createApiClient, getApiBaseUrl, ApiError } from "./client.js";
-export { uploadProjectWithProgress, createProjectFormData, type UploadProgress, type UploadOptions, type CreateProjectResponse, ApiError as UploadApiError } from "./upload.js";
+export { createApiClient, getApiBaseUrl, ApiError } from "./client";
+export { uploadProjectWithProgress, createProjectFormData, type UploadProgress, type UploadOptions, type CreateProjectResponse, ApiError as UploadApiError } from "./upload";
 
 // Re-exportar tipos generados para consumo externo
 export type {
@@ -12,7 +12,7 @@ export type {
   components,
   operations,
   webhooks,
-} from "./schema.js";
+} from "./schema";
 
 // Tipos de conveniencia para uso común (usando los tipos generados)
 import type { paths as Paths, components as Components } from "./schema.js";

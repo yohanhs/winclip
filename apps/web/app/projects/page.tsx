@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
 
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { ProjectList } from "@/components/projects";
 
 export const metadata: Metadata = { title: "Proyectos" };
 
 export default function ProjectsPage() {
   return (
-    <PagePlaceholder
-      title="Proyectos"
-      description="Cada vídeo largo (URL o archivo) con sus clips generados."
-    >
-      Aquí verás las cards de proyectos con su estado, duración y clips. Llega con el change
-      <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">add-web-ui-cards</code>.
-    </PagePlaceholder>
+    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Proyectos</h1>
+        <p className="text-sm text-muted-foreground">
+          Cada vídeo largo (URL o archivo) con sus clips generados.
+        </p>
+      </header>
+      <ProjectList />
+    </div>
   );
 }
