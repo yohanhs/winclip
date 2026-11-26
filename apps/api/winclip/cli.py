@@ -2,13 +2,25 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 import typer
 from rich.console import Console
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
 from rich.table import Table
 
 from winclip import __version__
 from winclip.core.config import get_settings
 from winclip.core.doctor import CheckResult, has_errors, run_checks
+from winclip.core.ids import InvalidProjectIdError
+from winclip.core.storage import StoragePathError
+from winclip.pipeline.ingest import IngestError
+from winclip.pipeline.ingest import ingest as run_ingest
+from winclip.pipeline.transcribe import (
+    SUPPORTED_LANGUAGES,
+    TranscriptionError,
+)
+from winclip.pipeline.transcribe import transcribe as run_transcribe
 
 app = typer.Typer(
     name="winclip",
@@ -19,6 +31,24 @@ app = typer.Typer(
 
 _STATUS_STYLE = {"ok": "green", "warn": "yellow", "error": "red"}
 _STATUS_LABEL = {"ok": "ok", "warn": "aviso", "error": "error"}
+_STAGE_LABELS = {
+    "download": "descargando",
+    "copy": "copiando",
+    "probe": "inspeccionando",
+    "extract_audio": "extrayendo audio",
+    "load_model": "cargando modelo",
+    "transcribe": "transcribiendo",
+    "save": "guardando",
+}
+
+
+def _progress_bar() -> Progress:
+    return Progress(
+        TextColumn("[bold]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        transient=True,
+    )
 
 
 def _print_doctor_table(console: Console, app_name: str, results: list[CheckResult]) -> None:
@@ -53,6 +83,110 @@ def doctor() -> None:
 
     if has_errors(results):
         raise typer.Exit(code=1)
+
+
+@app.command("ingest")
+def ingest_command(
+    source: Annotated[str, typer.Argument(help="URL del video o ruta de un archivo local")],
+    project_id: Annotated[
+        str | None,
+        typer.Option("--project-id", help="Identificador del proyecto (por defecto, un ULID)"),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Reingesta aunque el proyecto ya exista"),
+    ] = False,
+) -> None:
+    """Descarga o copia un video, extrae metadatos y audio mono 16 kHz."""
+    settings = get_settings()
+    console = Console()
+    progress_ui = _progress_bar()
+    try:
+        with progress_ui:
+            task_id = progress_ui.add_task("preparando", total=100)
+
+            def on_progress(value: float, stage: str) -> None:
+                progress_ui.update(
+                    task_id,
+                    completed=min(100.0, max(0.0, value)),
+                    description=_STAGE_LABELS.get(stage, stage),
+                )
+
+            result = run_ingest(
+                source,
+                settings=settings,
+                project_id=project_id,
+                force=force,
+                progress=on_progress,
+            )
+    except (IngestError, InvalidProjectIdError, StoragePathError) as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"[green]proyecto:[/green] {result.project_id}")
+    console.print(f"video: {result.video_path}")
+    console.print(f"audio: {result.audio_path}")
+    meta = result.meta
+    resolution = f"{meta.width}x{meta.height}" if meta.width and meta.height else "desconocida"
+    console.print(f"duración: {meta.duration:.1f} s · {resolution} · {meta.video_codec or '?'}")
+
+
+@app.command("transcribe")
+def transcribe_command(
+    project_id: Annotated[str, typer.Argument(help="Identificador del proyecto ingestado")],
+    language: Annotated[
+        str,
+        typer.Option("--language", help="Idioma del audio: es, en o auto"),
+    ] = "auto",
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Modelo de Whisper o el atajo 'tiny'"),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Recalcula aunque ya exista transcript.json"),
+    ] = False,
+) -> None:
+    """Transcribe el audio del proyecto con timestamps por palabra."""
+    settings = get_settings()
+    console = Console()
+    if language.strip().lower() not in SUPPORTED_LANGUAGES:
+        console.print(
+            f"[red]error:[/red] idioma no soportado: {language}; valores válidos: es, en, auto"
+        )
+        raise typer.Exit(code=1)
+
+    progress_ui = _progress_bar()
+    try:
+        with progress_ui:
+            task_id = progress_ui.add_task("preparando", total=100)
+
+            def on_progress(value: float, stage: str) -> None:
+                progress_ui.update(
+                    task_id,
+                    completed=min(100.0, max(0.0, value)),
+                    description=_STAGE_LABELS.get(stage, stage),
+                )
+
+            result = run_transcribe(
+                project_id,
+                settings=settings,
+                language=language,
+                model=model,
+                force=force,
+                progress=on_progress,
+            )
+    except (TranscriptionError, InvalidProjectIdError, StoragePathError) as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if result.reused:
+        console.print("[yellow]reutilizando transcripción previa[/yellow]")
+    console.print(f"[green]transcripción:[/green] {result.path}")
+    console.print(
+        f"idioma: {result.transcript.language} · modelo: {result.transcript.model} · "
+        f"segmentos: {len(result.transcript.segments)}"
+    )
 
 
 @app.command()
