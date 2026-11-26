@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from winclip.core.config import Settings, get_settings
+from winclip.core.config import (
+    DEFAULT_FFMPEG_BIN,
+    DEFAULT_FFPROBE_BIN,
+    Settings,
+    get_settings,
+)
 
 # Variables que podrían venir del entorno de la máquina y falsear los tests.
 _WINCLIP_ENV_VARS = (
@@ -99,15 +104,16 @@ def silent_video(tmp_path: Path, ffmpeg_settings: Settings) -> Path:
 
 
 @pytest.fixture
-def cli_session(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ffmpeg_settings: Settings
-) -> Iterator[Path]:
-    """`STORAGE_DIR` temporal para invocar la CLI real y `get_settings` sin caché."""
+def cli_session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Path]:
+    """`STORAGE_DIR` temporal para invocar la CLI real y `get_settings` sin caché.
+
+    No exige que ffmpeg exista: los tests que generan media piden su propia fixture.
+    """
     storage_dir = tmp_path / "cli-storage"
     monkeypatch.setenv("STORAGE_DIR", str(storage_dir))
-    monkeypatch.setenv("FFMPEG_BIN", str(ffmpeg_settings.ffmpeg_bin))
-    monkeypatch.setenv("FFPROBE_BIN", str(ffmpeg_settings.ffprobe_bin))
-    monkeypatch.setenv("WHISPER_MODEL", ffmpeg_settings.whisper_model)
+    monkeypatch.setenv("FFMPEG_BIN", str(DEFAULT_FFMPEG_BIN))
+    monkeypatch.setenv("FFPROBE_BIN", str(DEFAULT_FFPROBE_BIN))
+    monkeypatch.setenv("WHISPER_MODEL", "mlx-community/whisper-tiny")
     get_settings.cache_clear()
     yield storage_dir
     get_settings.cache_clear()
