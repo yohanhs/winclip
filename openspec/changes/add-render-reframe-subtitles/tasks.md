@@ -26,8 +26,8 @@
 
 ## 5. Verificación integrada y rendimiento
 
-- [ ] 5.1 Añadir test de integración `@pytest.mark.slow` en `apps/api/tests/test_render_integration.py` que genere un video sintético 1080p (`testsrc2` + `sine`), ejecute `winclip render` con ambos motores (`ass` y `pil`), modos `face`, `center` y `blur`, hook overlay e idempotencia, y verifique vía `FFPROBE_BIN` resolución `1080x1920`, `fps <= 30`, audio AAC, `thumb.jpg` válido, `subs.ass` no vacío, `render.json` exacto a §6.3 y progreso monotónico. Verificar ejecutando `uv run --project apps/api pytest -m slow tests/test_render_integration.py`.
-- [ ] 5.2 Medir el tiempo de renderizado extremo a extremo en Apple Silicon M1 sobre un clip sintético 1080p de 60 segundos (modo `face`, motor `ass`, `h264_videotoolbox`, hook overlay y `loudnorm`) confirmando que completa en `< 60 s`, y ejecutar toda la suite de calidad: `uv run --project apps/api ruff check . && uv run --project apps/api ruff format --check . && uv run --project apps/api pytest && openspec validate add-render-reframe-subtitles --strict`.
+- [x] 5.1 Añadir test de integración `@pytest.mark.slow` en `apps/api/tests/test_render_integration.py` que genere un video sintético 1080p (`testsrc2` + `sine`), ejecute `winclip render` con ambos motores (`ass` y `pil`), modos `face`, `center` y `blur`, hook overlay e idempotencia, y verifique vía `FFPROBE_BIN` resolución `1080x1920`, `fps <= 30`, audio AAC, `thumb.jpg` válido, `subs.ass` no vacío, `render.json` exacto a §6.3 y progreso monotónico. Verificar ejecutando `uv run --project apps/api pytest -m slow tests/test_render_integration.py`.
+- [x] 5.2 Medir el tiempo de renderizado extremo a extremo en Apple Silicon M1 sobre un clip sintético 1080p de 60 segundos (modo `face`, motor `ass`, `h264_videotoolbox`, hook overlay y `loudnorm`) confirmando que completa en `< 60 s`, y ejecutar toda la suite de calidad: `uv run --project apps/api ruff check . && uv run --project apps/api ruff format --check . && uv run --project apps/api pytest && openspec validate add-render-reframe-subtitles --strict`.
 
 ## Workflow follow-up
 
