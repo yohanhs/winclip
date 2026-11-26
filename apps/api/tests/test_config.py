@@ -29,6 +29,20 @@ def test_defaults_load_without_env_file() -> None:
     assert all(present is False for present in settings.api_key_presence.values())
 
 
+def test_llm_defaults_load_without_env_file() -> None:
+    settings = _settings()
+
+    assert settings.gemini_model == "gemini-2.5-flash"
+    assert settings.nvidia_model == "meta/llama-3.3-70b-instruct"
+    assert settings.openrouter_model == "meta-llama/llama-3.3-70b-instruct:free"
+    assert settings.groq_model == "llama-3.3-70b-versatile"
+    assert settings.ollama_model == "qwen3.5:4b"
+    assert settings.llm_timeout_seconds == 60
+    assert settings.llm_max_retries_per_provider == 2
+    assert settings.llm_score_threshold == 60
+    assert settings.llm_single_pass_max_chars == 45000
+
+
 def test_database_url_follows_storage_dir(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("STORAGE_DIR", str(tmp_path / "datos"))
 

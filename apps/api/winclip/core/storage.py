@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -15,9 +16,15 @@ from winclip.core.ids import validate_project_id
 SOURCE_DIR = "source"
 AUDIO_DIR = "audio"
 TRANSCRIPT_DIR = "transcript"
+SELECTION_DIR = "selection"
+CACHE_DIR = "cache"
+LLM_CACHE_DIR = "llm"
 SOURCE_META_FILENAME = "meta.json"
 AUDIO_FILENAME = "audio16k.wav"
 TRANSCRIPT_FILENAME = "transcript.json"
+CANDIDATES_FILENAME = "candidates.json"
+
+_CACHE_KEY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class StoragePathError(ValueError):
@@ -66,6 +73,22 @@ class LocalStorage:
 
     def transcript_path(self, project_id: str) -> Path:
         return self.transcript_dir(project_id) / TRANSCRIPT_FILENAME
+
+    def selection_dir(self, project_id: str) -> Path:
+        return self.project_dir(project_id) / SELECTION_DIR
+
+    def selection_path(self, project_id: str) -> Path:
+        """`selection/candidates.json` del proyecto (`docs/architecture.md §6.2`)."""
+        return self.selection_dir(project_id) / CANDIDATES_FILENAME
+
+    def llm_cache_dir(self) -> Path:
+        return self.path(CACHE_DIR, LLM_CACHE_DIR)
+
+    def llm_cache_path(self, cache_key: str) -> Path:
+        """`cache/llm/<sha256>.json`, validando que la clave sea un SHA-256 hexadecimal."""
+        if not _CACHE_KEY_PATTERN.fullmatch(cache_key):
+            raise StoragePathError(f"clave de caché LLM inválida: {cache_key!r}")
+        return self.llm_cache_dir() / f"{cache_key}.json"
 
     def ensure_project_dirs(self, project_id: str) -> Path:
         """Crea `source/` y `audio/` del proyecto y devuelve su directorio raíz."""

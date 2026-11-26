@@ -14,9 +14,14 @@ class InvalidProjectIdError(ValueError):
     """El identificador no cumple el formato permitido."""
 
 
-def new_project_id() -> str:
+def new_ulid() -> str:
     """Genera un ULID ordenable cronológicamente y lo devuelve en minúsculas."""
     return str(ULID()).lower()
+
+
+def new_project_id() -> str:
+    """Identificador de proyecto: un ULID en minúsculas."""
+    return new_ulid()
 
 
 def validate_project_id(project_id: str) -> str:
