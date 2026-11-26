@@ -383,6 +383,7 @@ def _run_render_stage(
                 options,
                 settings=ctx.settings,
                 on_progress=on_progress,
+                clip_id=target.id,
             )
             rendered.append(_apply_render(ctx, project, target, manifest))
             ctx.progress(base + share, "render")

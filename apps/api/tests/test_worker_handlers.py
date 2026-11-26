@@ -78,6 +78,8 @@ def test_pipeline_runs_all_stages_and_creates_rendered_clips(env) -> None:
     assert all(clip.status == "rendered" for clip in clips)
     assert all(clip.path and clip.thumb_path for clip in clips)
     for clip in clips:
+        # El directorio publicado usa el id de la fila `clip` (§5 del contrato).
+        assert clip.path == f"projects/{project.id}/clips/{clip.id}/clip.mp4"
         assert storage.resolve_safe(clip.path or "").is_file()
         assert storage.resolve_safe(clip.thumb_path or "").is_file()
     assert project_row is not None and project_row.status == "ready"

@@ -725,8 +725,14 @@ def render_clip(
     *,
     settings: Settings | None = None,
     on_progress: Callable[[RenderProgress], None] | None = None,
+    clip_id: str | None = None,
 ) -> RenderManifest:
-    """Renderiza un candidato a `clips/<clip_id>/` y devuelve su manifiesto."""
+    """Renderiza un candidato a `clips/<clip_id>/` y devuelve su manifiesto.
+
+    `clip_id` permite que el worker use el identificador de la fila `clip`, de modo que
+    el directorio publicado coincida con `docs/architecture.md §5`; por CLI se genera un
+    ULID nuevo cuando el candidato aún no tiene carpeta.
+    """
     settings = settings or get_settings()
     storage = LocalStorage(settings.storage_dir)
     validate_project_id(project_id)
@@ -777,7 +783,8 @@ def render_clip(
             )
         return manifest
 
-    clip_id = existing.name if existing is not None else new_ulid()
+    desired_clip_id = validate_project_id(clip_id) if clip_id else None
+    clip_id = existing.name if existing is not None else desired_clip_id or new_ulid()
     tmp_dir = clips_dir / f".tmp-{new_ulid()}"
     tmp_dir.mkdir(parents=True, exist_ok=False)
     reporter = _ProgressReporter(clip_id, candidate.id, on_progress)

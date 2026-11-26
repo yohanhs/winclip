@@ -126,10 +126,19 @@ class FakePipeline:
         storage.write_json_atomic(storage.selection_path(project_id), document)
         return SimpleNamespace(document=document)
 
-    def render(self, project_id: str, candidate_id: str, options, *, settings, on_progress) -> Any:
+    def render(
+        self,
+        project_id: str,
+        candidate_id: str,
+        options,
+        *,
+        settings,
+        on_progress,
+        clip_id: str | None = None,
+    ) -> Any:
         self.calls.append(f"render:{candidate_id}")
         storage = LocalStorage(settings.storage_dir)
-        clip_id = new_ulid()
+        clip_id = clip_id or new_ulid()
         target = storage.clip_dir(project_id, clip_id)
         target.mkdir(parents=True, exist_ok=True)
         (target / "clip.mp4").write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"0" * 2048)
