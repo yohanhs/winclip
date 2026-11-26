@@ -2,7 +2,7 @@
 
 ## Context
 
-`setup-foundation` dejó `apps/web` (Next.js 15 App Router, TypeScript strict, Tailwind v4, shadcn/ui, TanStack Query) con el layout base, sidebar y `packages/api-client` vacío. `add-api-jobs` entrega la API REST bajo `/api`, el stream SSE en `/api/events` y un esquema OpenAPI con `operationId` estables. Véase `proposal.md` para la motivación y el alcance.
+`setup-foundation` dejó `apps/web` (Next.js 16 App Router, TypeScript strict, Tailwind v4, shadcn/ui, TanStack Query) con el layout base, sidebar y `packages/api-client` vacío. `add-api-jobs` entrega la API REST bajo `/api`, el stream SSE en `/api/events` y un esquema OpenAPI con `operationId` estables. Véase `proposal.md` para la motivación y el alcance.
 
 ## Goals / Non-Goals
 
@@ -72,7 +72,7 @@ Contratos nuevos introducidos por este change (alineados con `docs/architecture.
 
 6. **Estrategia de pruebas: Vitest + Testing Library + Playwright + MSW.**
    - *Por qué:* Vitest ofrece ejecución rápida en TypeScript/ESM junto a React Testing Library para lógica de formularios, `mini-timeline`, `subtitle-preset-preview` y `clip-card`; Playwright valida flujos completos en navegador real (creación URL/archivo, recepción SSE simulada, edición, trim/rerender, multiselección) interceptando la API con MSW (o `page.route` respaldado por los mismos fixtures MSW para SSE) de forma determinista y sin necesitar FFmpeg ni MLX en CI.
-   - *Alternativa descartada:* Jest (configuración más pesada con ESM/Next 15) o e2e contra backend real en cada PR (lento y dependiente de modelos GPU).
+   - *Alternativa descartada:* Jest (configuración más pesada con ESM/Next 16) o e2e contra backend real en cada PR (lento y dependiente de modelos GPU).
    - *Dependencias nuevas (devDependencies en `apps/web`):* `vitest`, `@vitejs/plugin-react`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, `msw`, `@playwright/test`.
 
 ## Risks / Trade-offs

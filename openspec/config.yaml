@@ -16,7 +16,7 @@ context: |
   Repo PÚBLICO en GitHub (yohanhs/winclip), licencia AGPL-3.0.
 
   ## Stack (no cambiar sin un change de OpenSpec)
-  - Monorepo pnpm: apps/web (Next.js 15 App Router, TypeScript strict, Tailwind v4, shadcn/ui,
+  - Monorepo pnpm (Node >= 24): apps/web (Next.js 16 App Router, TypeScript strict, Tailwind v4, shadcn/ui,
     TanStack Query), apps/api (FastAPI, Python 3.12 gestionado con uv, SQLModel + SQLite,
     pydantic-settings), packages/api-client (cliente TS generado desde OpenAPI).
   - Jobs: cola persistente propia sobre SQLite, worker en proceso separado, un job GPU a la vez.

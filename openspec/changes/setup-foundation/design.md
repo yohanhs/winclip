@@ -26,12 +26,12 @@ El repositorio está vacío, salvo `openspec/` y `docs/architecture.md`, que def
    - playwright: buscar Chromium en `~/Library/Caches/ms-playwright/chromium-*` → `warn` si falta.
    - claves: `present`/`absent` por nombre.
 4. **`concurrently` en el package.json raíz**, con `--kill-others-on-fail` y prefijos `api`/`web`. El script de la API usa `uv run --project apps/api uvicorn winclip.main:app --reload --port 8000`. Alternativas: Procfile/honcho, que añade una dependencia Python innecesaria; turbo, excesivo por ahora.
-5. **Next.js 15 App Router + Tailwind v4 + shadcn/ui + TanStack Query.** El fetch a la API va por `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). CORS en FastAPI solo para `http://localhost:3000`.
+5. **Next.js 16 App Router (última estable) + Tailwind v4 + shadcn/ui + TanStack Query (Node >= 24).** El fetch a la API va por `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). CORS en FastAPI derivado de `WEB_PORT` (default `http://localhost:3000`).
 6. **Seguridad:** `pre-commit` (instalado con `uv tool install pre-commit`) con el hook oficial `gitleaks/gitleaks` y `ruff`. En CI se usa `gitleaks/gitleaks-action@v2`, más jobs `api` (uv sync, ruff, pytest) y `web` (pnpm install, lint, build).
 7. **Fuentes OFL** descargadas de Google Fonts, cada familia con su `OFL.txt`: Montserrat, Poppins, Anton, Bebas Neue, League Spartan, Inter. Noto Color Emoji se deja para el change 3.
 
 ## Risks / Trade-offs
 
 - [El disco externo no está montado y Ollama falla] → por diseño es solo `warn`.
-- [Next 15 y Tailwind v4 introducen cambios frecuentes] → fijar versiones exactas en el lockfile.
+- [Next 16 y Tailwind v4 introducen cambios frecuentes] → fijar versiones exactas en el lockfile y requerir Node >= 24 (alineado con CI y nvm local v24.22.1).
 - [gitleaks da falsos positivos con IDs de ejemplo en docs] → `.gitleaks.toml` con allowlist mínima y documentada.

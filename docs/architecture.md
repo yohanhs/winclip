@@ -7,7 +7,7 @@ Si un change necesita alterar un contrato de aquí, debe actualizar este archivo
 
 ```mermaid
 flowchart LR
-  WEB["apps/web (Next.js 15)"] -->|REST + SSE| API["apps/api (FastAPI)"]
+  WEB["apps/web (Next.js 16)"] -->|REST + SSE| API["apps/api (FastAPI)"]
   API --> DB[("SQLite: storage/winclip.db")]
   API -->|encola| Q[("tabla jobs")]
   W["worker (proceso aparte)"] -->|toma jobs| Q

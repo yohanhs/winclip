@@ -6,7 +6,7 @@ WinClip arranca desde un directorio vacío. Antes de construir el pipeline de cl
 
 ## What Changes
 
-- Monorepo pnpm con `apps/web` (Next.js 15), `apps/api` (FastAPI, Python 3.12 con uv) y `packages/api-client` (vacío por ahora, preparado para generación OpenAPI).
+- Monorepo pnpm con `apps/web` (Next.js 16), `apps/api` (FastAPI, Python 3.12 con uv) y `packages/api-client` (vacío por ahora, preparado para generación OpenAPI).
 - Configuración central del backend (`.env` → Settings) con las variables de `docs/architecture.md §4` y un `.env.example` documentado.
 - Endpoint `GET /api/health` y comando CLI `winclip doctor`, que verifican: ffmpeg-full con libass, ffprobe, yt-dlp, modelo whisper en caché, Ollama accesible, presencia (sin revelar valor) de las claves LLM, Chromium de Playwright, disco `/Volumes/yohan` montado (aviso, no error) y directorio de almacenamiento escribible.
 - Página web "Estado del sistema" que muestra el resultado del doctor, más el layout base con navegación (Proyectos, Campañas, Cuentas, Publicaciones, Ajustes) con páginas placeholder.
@@ -28,5 +28,5 @@ WinClip arranca desde un directorio vacío. Antes de construir el pipeline de cl
 
 - Código nuevo: `apps/api`, `apps/web`, `packages/api-client`, `scripts/`, `.github/workflows/ci.yml`, `assets/fonts`.
 - Dependencias Python: fastapi, uvicorn[standard], pydantic-settings, typer, rich, httpx; desarrollo: ruff, pytest, pytest-asyncio.
-- Dependencias JS: next@15, react, tailwindcss v4, shadcn/ui, @tanstack/react-query, concurrently.
+- Dependencias JS: next@16 (última estable), react, tailwindcss v4, shadcn/ui, @tanstack/react-query, concurrently.
 - Herramientas: pre-commit, gitleaks.
