@@ -61,6 +61,24 @@ export function useProjects() {
 }
 
 /**
+ * Hook para obtener presets de subtítulos
+ */
+export function usePresets() {
+  const apiClient = useApiClient();
+
+  return useQuery({
+    queryKey: ["presets"],
+    queryFn: async () => {
+      if (!apiClient) throw new Error("API client not initialized");
+      const response = await apiClient.GET("/api/presets");
+      if (response.error) throw new Error("Failed to fetch presets");
+      return response.data;
+    },
+    staleTime: 300_000, // 5 minutes cache
+  });
+}
+
+/**
  * Hook para gestión de clips de un proyecto
  */
 export function useProjectClips(projectId: string | undefined) {

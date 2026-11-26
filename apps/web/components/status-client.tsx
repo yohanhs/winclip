@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
-  CheckCircle2,
+  CircleCheck,
   RefreshCw,
   TriangleAlert,
   type LucideIcon,
@@ -18,7 +18,7 @@ const STATUS_META: Record<CheckStatus, { label: string; className: string; Icon:
   ok: {
     label: "ok",
     className: "border-success/30 bg-success/10 text-success",
-    Icon: CheckCircle2,
+    Icon: CircleCheck,
   },
   warn: {
     label: "aviso",
