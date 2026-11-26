@@ -2,10 +2,10 @@
 
 ## 1. Raíz del monorepo y seguridad
 
-- [ ] 1.1 Crear `.gitignore` (Node, Python, `.env*` excepto `.env.example`, `client_secret*.json`, `**/tokens/`, `storage/`, `*.mp4|*.mov|*.wav|*.mp3|*.mkv|*.webm`, perfiles de Playwright, `.DS_Store`) y `.editorconfig`. Verificar: crear `apps/api/.env` y `client_secret_x.json` de prueba y comprobar que `git status --porcelain` no los lista; luego borrarlos.
-- [ ] 1.2 Añadir `LICENSE` (texto oficial AGPL-3.0) y un `README.md` inicial (qué es, requisitos, `pnpm dev`, `winclip doctor`, enlace a `docs/architecture.md`). Verificar que ambos archivos existen y que el README menciona AGPL-3.0.
-- [ ] 1.3 Crear `pnpm-workspace.yaml` (apps/*, packages/*) y un `package.json` raíz con los scripts `dev` (concurrently con `--kill-others-on-fail`, prefijos api/web), `lint` y `test`. Verificar con `pnpm install`, que debe terminar sin errores.
-- [ ] 1.4 Configurar `.pre-commit-config.yaml` con gitleaks y ruff, más `.gitleaks.toml`. Verificar: `pre-commit run --all-files` pasa, y un archivo temporal con `AIzaSy` + 33 caracteres falsos hace fallar `pre-commit run gitleaks --files <archivo>`.
+- [x] 1.1 Crear `.gitignore` (Node, Python, `.env*` excepto `.env.example`, `client_secret*.json`, `**/tokens/`, `storage/`, `*.mp4|*.mov|*.wav|*.mp3|*.mkv|*.webm`, perfiles de Playwright, `.DS_Store`) y `.editorconfig`. Verificar: crear `apps/api/.env` y `client_secret_x.json` de prueba y comprobar que `git status --porcelain` no los lista; luego borrarlos.
+- [x] 1.2 Añadir `LICENSE` (texto oficial AGPL-3.0) y un `README.md` inicial (qué es, requisitos, `pnpm dev`, `winclip doctor`, enlace a `docs/architecture.md`). Verificar que ambos archivos existen y que el README menciona AGPL-3.0.
+- [x] 1.3 Crear `pnpm-workspace.yaml` (apps/*, packages/*) y un `package.json` raíz con los scripts `dev` (concurrently con `--kill-others-on-fail`, prefijos api/web), `lint` y `test`. Verificar con `pnpm install`, que debe terminar sin errores.
+- [x] 1.4 Configurar `.pre-commit-config.yaml` con gitleaks y ruff, más `.gitleaks.toml`. Verificar: `pre-commit run --all-files` pasa, y un archivo temporal con `AIzaSy` + 33 caracteres falsos hace fallar `pre-commit run gitleaks --files <archivo>`.
 
 ## 2. Backend base (apps/api)
 

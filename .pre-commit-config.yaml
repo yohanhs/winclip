@@ -1,0 +1,24 @@
+# Hooks locales de WinClip. Instalar con: pre-commit install
+default_install_hook_types: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secretos)
+        description: Bloquea commits con claves, tokens o credenciales. Requiere `brew install gitleaks`.
+        entry: scripts/gitleaks-hook.sh
+        language: script
+        pass_filenames: true
+        require_serial: true
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+        name: ruff check (apps/api)
+        args: [--fix]
+        files: ^apps/api/.*\.py$
+      - id: ruff-format
+        name: ruff format (apps/api)
+        files: ^apps/api/.*\.py$

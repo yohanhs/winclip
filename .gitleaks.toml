@@ -1,0 +1,15 @@
+# Configuración de gitleaks para WinClip.
+# Se extienden las reglas oficiales y solo se añade una allowlist mínima y documentada
+# para placeholders de documentación. Nunca se permite por ruta completa: un secreto real
+# en un .md también debe bloquear el commit.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders de documentación (nunca claves reales)"
+regexTarget = "match"
+regexes = [
+  '''(?i)your[_-]?api[_-]?key''',
+  '''(?i)api[_-]?key[_-]?here''',
+  '''(?i)(placeholder|changeme|replace[_-]?me)''',
+]

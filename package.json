@@ -1,0 +1,28 @@
+{
+  "name": "winclip",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clipping local: vídeos largos a shorts verticales con subtítulos y publicación multi-red",
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@10.29.3",
+  "engines": {
+    "node": ">=20.9.0",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "concurrently --names api,web --prefix-colors cyan,magenta --kill-others-on-fail \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:api": "uv run --project apps/api uvicorn winclip.main:app --reload --port ${API_PORT:-8000}",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm run lint:web && pnpm run lint:api",
+    "lint:web": "pnpm --filter web lint",
+    "lint:api": "uv run --project apps/api ruff check apps/api && uv run --project apps/api ruff format --check apps/api",
+    "test": "pnpm run test:api && pnpm run typecheck:web",
+    "test:api": "uv run --project apps/api pytest apps/api/tests",
+    "typecheck:web": "pnpm --filter web typecheck",
+    "doctor": "uv run --project apps/api winclip doctor"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
