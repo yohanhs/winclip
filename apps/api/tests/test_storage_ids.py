@@ -6,7 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from winclip.core.ids import InvalidProjectIdError, new_project_id, validate_project_id
+from winclip.core.ids import (
+    InvalidProjectIdError,
+    new_clip_id,
+    new_job_id,
+    new_project_id,
+    validate_project_id,
+    validate_ulid,
+)
 from winclip.core.storage import LocalStorage, StoragePathError
 
 
@@ -72,3 +79,58 @@ def test_write_json_atomic_rejects_non_object_payload(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="objeto JSON"):
         storage.read_json(path)
+
+
+def test_resolve_safe_accepts_relative_paths(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path)
+    target = storage.path("projects", "p1", "clips", "c1", "clip.mp4")
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"mp4")
+
+    resolved = storage.resolve_safe("projects/p1/clips/c1/clip.mp4")
+
+    assert resolved == target
+    assert storage.resolve_safe(target.relative_to(tmp_path)) == target
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["../escape.mp4", "projects/../../escape.mp4", "/etc/passwd", "a/../../b"],
+)
+def test_resolve_safe_rejects_traversal_and_absolute_paths(tmp_path: Path, value: str) -> None:
+    storage = LocalStorage(tmp_path)
+
+    with pytest.raises(StoragePathError):
+        storage.resolve_safe(value)
+
+
+def test_resolve_safe_rejects_symlink_escaping_storage(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "storage")
+    storage.root.mkdir(parents=True)
+    outside = tmp_path / "outside.mp4"
+    outside.write_bytes(b"secreto")
+    link = storage.root / "link.mp4"
+    link.symlink_to(outside)
+
+    with pytest.raises(StoragePathError):
+        storage.resolve_safe("link.mp4")
+
+
+def test_clip_paths_live_under_project_clips_dir(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path)
+
+    assert (
+        storage.clip_video_path("p1", "c1")
+        == (tmp_path / "projects" / "p1" / "clips" / "c1" / "clip.mp4").resolve()
+    )
+    assert storage.clip_thumb_path("p1", "c1").name == "thumb.jpg"
+
+
+def test_validate_ulid_accepts_generated_ids_and_rejects_others() -> None:
+    value = new_project_id()
+
+    assert validate_ulid(value) == value
+    assert new_clip_id() != new_job_id()
+    for invalid in ("", "abc", "../escape", value + "x", "!" * 26):
+        with pytest.raises(InvalidProjectIdError):
+            validate_ulid(invalid)

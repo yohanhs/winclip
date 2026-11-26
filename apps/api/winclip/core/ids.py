@@ -8,6 +8,8 @@ from ulid import ULID
 
 # Identificador seguro para usar como nombre de carpeta: sin `/`, `..` ni mayúsculas.
 PROJECT_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
+# ULID canónico en minúsculas (Crockford base32) tal como lo emite `python-ulid`.
+_ULID_PATTERN = re.compile(r"^[0-9a-hjkmnp-tv-z]{26}$")
 
 
 class InvalidProjectIdError(ValueError):
@@ -22,6 +24,23 @@ def new_ulid() -> str:
 def new_project_id() -> str:
     """Identificador de proyecto: un ULID en minúsculas."""
     return new_ulid()
+
+
+def new_clip_id() -> str:
+    """Identificador de clip: un ULID en minúsculas."""
+    return new_ulid()
+
+
+def new_job_id() -> str:
+    """Identificador de trabajo de la cola: un ULID en minúsculas."""
+    return new_ulid()
+
+
+def validate_ulid(value: str) -> str:
+    """Valida un ULID (26 caracteres Crockford en minúsculas) y lo devuelve."""
+    if not isinstance(value, str) or not _ULID_PATTERN.fullmatch(value):
+        raise InvalidProjectIdError(f"ULID inválido: {value!r}")
+    return value
 
 
 def validate_project_id(project_id: str) -> str:

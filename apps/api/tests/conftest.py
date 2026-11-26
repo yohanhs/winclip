@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 from winclip.core.config import (
     DEFAULT_FFMPEG_BIN,
@@ -48,6 +49,12 @@ _WINCLIP_ENV_VARS = (
     "META_APP_SECRET",
     "WINCLIP_SECRET_KEY",
     "USER_FONTS_DIR",
+    "WORKER_LIGHT_CONCURRENCY",
+    "WORKER_POLL_INTERVAL",
+    "JOB_MAX_ATTEMPTS",
+    "JOB_STALE_SECONDS",
+    "UPLOAD_MAX_BYTES",
+    "SSE_HEARTBEAT_SECONDS",
 )
 
 
@@ -56,6 +63,34 @@ def clean_winclip_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Aísla los tests de la configuración real de la máquina."""
     for name in _WINCLIP_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture
+def api_settings(tmp_path: Path) -> Settings:
+    """Settings con base de datos y almacenamiento temporales, sin `.env`."""
+    storage_dir = tmp_path / "storage"
+    return Settings(
+        _env_file=None,
+        storage_dir=storage_dir,
+        database_url=f"sqlite:///{storage_dir / 'winclip.db'}",
+        whisper_model="mlx-community/whisper-tiny",
+        sse_heartbeat_seconds=0.2,
+    )
+
+
+@pytest.fixture
+def api_client(api_settings: Settings) -> Iterator[TestClient]:
+    """TestClient con la app real, SQLite temporal y broadcaster SSE activo."""
+    from winclip.main import create_app
+
+    with TestClient(create_app(api_settings)) as client:
+        yield client
+
+
+@pytest.fixture
+def api_engine(api_client: TestClient):
+    """Motor SQLite del lifespan de la app de test."""
+    return api_client.app.state.engine
 
 
 @pytest.fixture

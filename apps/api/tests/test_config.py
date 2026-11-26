@@ -90,3 +90,32 @@ def test_relative_storage_dir_is_anchored_to_repo_root(monkeypatch) -> None:
     settings = _settings()
 
     assert settings.storage_dir == ROOT_DIR / "datos-locales"
+
+
+def test_worker_upload_and_sse_defaults() -> None:
+    settings = _settings()
+
+    assert settings.worker_light_concurrency == 2
+    assert settings.worker_poll_interval == 1.0
+    assert settings.job_max_attempts == 3
+    assert settings.job_stale_seconds == 300
+    assert settings.upload_max_bytes == 10 * 1024**3
+    assert settings.sse_heartbeat_seconds == 15.0
+
+
+def test_worker_settings_can_be_overridden(monkeypatch) -> None:
+    monkeypatch.setenv("WORKER_LIGHT_CONCURRENCY", "4")
+    monkeypatch.setenv("WORKER_POLL_INTERVAL", "0.25")
+    monkeypatch.setenv("JOB_MAX_ATTEMPTS", "5")
+    monkeypatch.setenv("JOB_STALE_SECONDS", "120")
+    monkeypatch.setenv("UPLOAD_MAX_BYTES", "2048")
+    monkeypatch.setenv("SSE_HEARTBEAT_SECONDS", "5")
+
+    settings = _settings()
+
+    assert settings.worker_light_concurrency == 4
+    assert settings.worker_poll_interval == 0.25
+    assert settings.job_max_attempts == 5
+    assert settings.job_stale_seconds == 120
+    assert settings.upload_max_bytes == 2048
+    assert settings.sse_heartbeat_seconds == 5.0

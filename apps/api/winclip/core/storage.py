@@ -14,6 +14,9 @@ from pydantic import BaseModel
 from winclip.core.ids import validate_project_id
 
 SOURCE_DIR = "source"
+CLIPS_DIR = "clips"
+CLIP_VIDEO_FILENAME = "clip.mp4"
+CLIP_THUMB_FILENAME = "thumb.jpg"
 AUDIO_DIR = "audio"
 TRANSCRIPT_DIR = "transcript"
 SELECTION_DIR = "selection"
@@ -80,6 +83,34 @@ class LocalStorage:
     def selection_path(self, project_id: str) -> Path:
         """`selection/candidates.json` del proyecto (`docs/architecture.md §6.2`)."""
         return self.selection_dir(project_id) / CANDIDATES_FILENAME
+
+    def clips_dir(self, project_id: str) -> Path:
+        """`projects/<project_id>/clips/` (`docs/architecture.md §5`)."""
+        return self.project_dir(project_id) / CLIPS_DIR
+
+    def clip_dir(self, project_id: str, clip_id: str) -> Path:
+        """`projects/<project_id>/clips/<clip_id>/`, validando ambos identificadores."""
+        return self.clips_dir(project_id) / validate_project_id(clip_id)
+
+    def clip_video_path(self, project_id: str, clip_id: str) -> Path:
+        return self.clip_dir(project_id, clip_id) / CLIP_VIDEO_FILENAME
+
+    def clip_thumb_path(self, project_id: str, clip_id: str) -> Path:
+        return self.clip_dir(project_id, clip_id) / CLIP_THUMB_FILENAME
+
+    def resolve_safe(self, relative: str | Path) -> Path:
+        """Resuelve una ruta **relativa** bajo la raíz y rechaza cualquier escape.
+
+        Resuelve symlinks antes de comparar, así que un enlace dentro de `STORAGE_DIR`
+        que apunte fuera también se rechaza. Se usa al servir `/file` y `/thumb`.
+        """
+        candidate = Path(relative)
+        if candidate.is_absolute() or any(part == ".." for part in candidate.parts):
+            raise StoragePathError(f"ruta no permitida: {relative}")
+        resolved = (self.root / candidate).resolve()
+        if not resolved.is_relative_to(self.root):
+            raise StoragePathError(f"ruta fuera de STORAGE_DIR: {resolved}")
+        return resolved
 
     def llm_cache_dir(self) -> Path:
         return self.path(CACHE_DIR, LLM_CACHE_DIR)

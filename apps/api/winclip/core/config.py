@@ -76,6 +76,14 @@ class Settings(BaseSettings):
     # Fuentes locales no redistribuibles
     user_fonts_dir: Path = Path("~/Library/Fonts")
 
+    # Worker, cola de trabajos, subidas y SSE (change 4)
+    worker_light_concurrency: int = Field(default=2, ge=1, le=16)
+    worker_poll_interval: float = Field(default=1.0, gt=0)
+    job_max_attempts: int = Field(default=3, ge=1)
+    job_stale_seconds: int = Field(default=300, ge=10)
+    upload_max_bytes: int = Field(default=10 * 1024**3, gt=0)
+    sse_heartbeat_seconds: float = Field(default=15.0, gt=0)
+
     @field_validator("storage_dir")
     @classmethod
     def _resolve_storage_dir(cls, value: Path) -> Path:
