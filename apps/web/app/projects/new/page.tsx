@@ -1,22 +1,23 @@
-"use client";
+import type { Metadata } from "next";
 
 import { ProjectCreateForm } from "@/components/projects/project-create-form";
 
+export const metadata: Metadata = { title: "Crear proyecto" };
+
 export default function NewProjectPage() {
   return (
-    <main className="flex-1 container mx-auto px-4 py-8 max-w-[1440px]">
-      <div className="space-y-6">
-        {/* Header */}
-        <header>
-          <h1 className="text-2xl font-bold text-zinc-100">Crear proyecto</h1>
-          <p className="text-zinc-400 mt-1">
-            Sube un video o pega una URL para generar clips optimizados
-          </p>
-        </header>
+    <main className="mx-auto w-full max-w-[1400px] space-y-6">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+          Crear proyecto
+        </h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          Sube un vídeo o pega una URL para generar clips verticales con
+          subtítulos.
+        </p>
+      </header>
 
-        {/* Form */}
-        <ProjectCreateForm />
-      </div>
+      <ProjectCreateForm />
     </main>
   );
 }

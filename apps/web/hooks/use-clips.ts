@@ -1,176 +1,104 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ClipOut, ClipUpdate, JobOut } from "@winclip/api-client";
+
 import { useApiClient } from "./use-api-client";
-import type { components } from "@winclip/api-client";
 
-/**
- * Hook para actualizar un clip (PATCH /api/clips/{id})
- */
-export function useUpdateClip() {
-  const apiClient = useApiClient();
+/** Clips de un proyecto, ordenados por score por el backend. */
+export function useProjectClips(projectId: string | null | undefined) {
+  const api = useApiClient();
+  return useQuery<ClipOut[]>({
+    queryKey: ["project-clips", projectId],
+    queryFn: async () => {
+      if (!projectId) throw new Error("Falta el id del proyecto");
+      const { data } = await api.GET("/api/projects/{project_id}/clips", {
+        params: { path: { project_id: projectId } },
+      });
+      return data ?? [];
+    },
+    enabled: Boolean(projectId),
+    refetchInterval: 20_000,
+  });
+}
+
+function useInvalidateClip(projectId: string | null | undefined) {
   const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({
+      queryKey: ["project-clips", projectId],
+    });
+    void queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    void queryClient.invalidateQueries({ queryKey: ["projects"] });
+  };
+}
 
-  return useMutation<
-    components["schemas"]["ClipOut"],
-    Error,
-    { clipId: string; data: components["schemas"]["ClipUpdate"] }
-  >({
+/** `PATCH /api/clips/{id}`: título, descripción, hashtags y tiempos. */
+export function useUpdateClip(projectId: string | null | undefined) {
+  const api = useApiClient();
+  const invalidate = useInvalidateClip(projectId);
+
+  return useMutation<ClipOut, Error, { clipId: string; data: ClipUpdate }>({
     mutationFn: async ({ clipId, data }) => {
-      if (!apiClient) throw new Error("API client not initialized");
-      const response = await apiClient.PATCH("/api/clips/{clip_id}", {
+      const response = await api.PATCH("/api/clips/{clip_id}", {
         params: { path: { clip_id: clipId } },
         body: data,
       });
-      if (response.error) throw new Error("Failed to update clip");
-      return response.data as components["schemas"]["ClipOut"];
+      if (!response.data) throw new Error("No se pudo actualizar el clip");
+      return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clips"] });
-    },
+    onSuccess: invalidate,
   });
 }
 
-/**
- * Hook para eliminar un clip (DELETE /api/clips/{id})
- */
-export function useDeleteClip() {
-  const apiClient = useApiClient();
-  const queryClient = useQueryClient();
+/** `DELETE /api/clips/{id}`. */
+export function useDeleteClip(projectId: string | null | undefined) {
+  const api = useApiClient();
+  const invalidate = useInvalidateClip(projectId);
 
   return useMutation<void, Error, string>({
     mutationFn: async (clipId) => {
-      if (!apiClient) throw new Error("API client not initialized");
-      const response = await apiClient.DELETE("/api/clips/{clip_id}", {
+      await api.DELETE("/api/clips/{clip_id}", {
         params: { path: { clip_id: clipId } },
       });
-      if (response.error) throw new Error("Failed to delete clip");
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clips"] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-    },
+    onSuccess: invalidate,
   });
 }
 
-/**
- * Hook para descargar un clip (GET /api/clips/{id}/file)
- */
-export function useDownloadClip() {
-  const apiClient = useApiClient();
+/** `POST /api/clips/{id}/rerender` tras recortar o cambiar tiempos. */
+export function useRerenderClip(projectId: string | null | undefined) {
+  const api = useApiClient();
+  const invalidate = useInvalidateClip(projectId);
 
-  return useMutation({
-    mutationFn: async (clipId: string) => {
-      if (!apiClient) throw new Error("API client not initialized");
-      const response = await apiClient.GET("/api/clips/{clip_id}/file", {
-        params: { path: { clip_id: clipId } },
-      });
-      if (response.error) throw new Error("Failed to download clip");
-      return response;
-    },
-    onError: (error) => {
-      console.error("Download error:", error);
-    },
-  });
-}
-
-/**
- * Hook para re-renderizar un clip (POST /api/clips/{id}/rerender)
- */
-export function useRerenderClip() {
-  const apiClient = useApiClient();
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    components["schemas"]["JobOut"],
-    Error,
-    string
-  >({
+  return useMutation<JobOut, Error, string>({
     mutationFn: async (clipId) => {
-      if (!apiClient) throw new Error("API client not initialized");
-      const response = await apiClient.POST("/api/clips/{clip_id}/rerender", {
+      const response = await api.POST("/api/clips/{clip_id}/rerender", {
         params: { path: { clip_id: clipId } },
       });
-      if (response.error) throw new Error("Failed to rerender clip");
-      return response.data as components["schemas"]["JobOut"];
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clips"] });
-    },
-  });
-}
-
-/**
- * Hook para actualizar tiempos de un clip (PATCH con start_sec/end_sec)
- */
-export function useUpdateClipTimes() {
-  const apiClient = useApiClient();
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    components["schemas"]["ClipOut"],
-    Error,
-    { clipId: string; startSec: number; endSec: number }
-  >({
-    mutationFn: async ({ clipId, startSec, endSec }) => {
-      if (!apiClient) throw new Error("API client not initialized");
-      const response = await apiClient.PATCH("/api/clips/{clip_id}", {
-        params: { path: { clip_id: clipId } },
-        body: { start_sec: startSec, end_sec: endSec },
-      });
-      if (response.error) throw new Error("Failed to update clip times");
-      return response.data as components["schemas"]["ClipOut"];
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clips"] });
-    },
-  });
-}
-
-/**
- * Hook para obtener estado de un job (GET /api/jobs/{id})
- */
-export function useJob(jobId: string | undefined) {
-  const apiClient = useApiClient();
-
-  return useQuery({
-    queryKey: ["jobs", jobId],
-    queryFn: async () => {
-      if (!apiClient) throw new Error("API client not initialized");
-      if (!jobId) return null;
-      const response = await apiClient.GET("/api/jobs/{job_id}", {
-        params: { path: { job_id: jobId } },
-      });
-      if (response.error) throw new Error("Failed to fetch job");
+      if (!response.data) throw new Error("No se pudo re-renderizar el clip");
       return response.data;
     },
-    enabled: !!jobId,
-    refetchInterval: 2000, // Polling every 2 seconds
+    onSuccess: invalidate,
   });
 }
 
-/**
- * Hook para cancelar un job (POST /api/jobs/{id}/cancel)
- */
-export function useCancelJob() {
-  const apiClient = useApiClient();
+/** `POST /api/jobs/{id}/cancel`: cancela el trabajo activo del proyecto. */
+export function useCancelJob(projectId: string | null | undefined) {
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
-  return useMutation<
-    components["schemas"]["JobOut"],
-    Error,
-    string
-  >({
+  return useMutation<JobOut, Error, string>({
     mutationFn: async (jobId) => {
-      if (!apiClient) throw new Error("API client not initialized");
-      const response = await apiClient.POST("/api/jobs/{job_id}/cancel", {
+      const response = await api.POST("/api/jobs/{job_id}/cancel", {
         params: { path: { job_id: jobId } },
       });
-      if (response.error) throw new Error("Failed to cancel job");
-      return response.data as components["schemas"]["JobOut"];
+      if (!response.data) throw new Error("No se pudo cancelar el trabajo");
+      return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }

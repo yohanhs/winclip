@@ -3,495 +3,350 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
+  FolderOpen,
   LayoutGrid,
   List,
-  FolderOpen,
+  Loader2,
+  Plus,
   RefreshCw,
-  AlertCircle,
-  Video,
-  HardDrive,
-  Play,
-  Film,
+  Search,
+  Sparkles,
 } from "lucide-react";
-import { ProjectCard } from "./project-card";
-import { useProjects, useHealth } from "@/hooks/use-api-client";
-import { Button } from "@/components/ui/button";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useQueryClient } from "@tanstack/react-query";
-import type { components } from "@winclip/api-client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjects } from "@/hooks/use-projects";
+import { useProjectEvents } from "@/hooks/use-project-events";
+import { errorMessage } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { ProjectCard } from "./project-card";
 
-type ProjectItem = components["schemas"]["ProjectOut"];
+type StatusFilter = "all" | "processing" | "ready" | "failed";
+type LanguageFilter = "all" | "es" | "en";
 
-// Helper to format date
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-// Helper to calculate pipeline progress from jobs
-function calculatePipelineProgress(
-  activeJob: components["schemas"]["JobSummary"] | null | undefined,
-  jobs?: components["schemas"]["JobOut"][]
-): number {
-  // Use active job progress if available
-  if (activeJob?.progress !== null && activeJob?.progress !== undefined) {
-    return activeJob.progress;
-  }
-
-  // Fallback: calculate from completed jobs
-  if (jobs && jobs.length > 0) {
-    const completedJobs = jobs.filter(
-      (j) => j.status === "ready" || j.status === "done"
-    ).length;
-    const totalJobs = jobs.length;
-    return totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0;
-  }
-
-  return 0;
-}
+const STATUS_FILTERS: Array<{ id: StatusFilter; label: string }> = [
+  { id: "all", label: "Todos" },
+  { id: "processing", label: "Procesando" },
+  { id: "ready", label: "Listos" },
+  { id: "failed", label: "Con error" },
+];
 
 export function ProjectList() {
-  const { data: projects, isLoading, isError, refetch } = useProjects();
-  const { data: health } = useHealth();
-  const queryClient = useQueryClient();
-
-  // Filter states
-  const [statusFilter, setStatusFilter] = useState<"all" | "processing" | "ready">(
-    "all"
-  );
-  const [langFilter, setLangFilter] = useState<"all" | "ES" | "EN">("all");
+  const projectsQuery = useProjects();
+  const { connected } = useProjectEvents(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [languageFilter, setLanguageFilter] = useState<LanguageFilter>("all");
+  const [search, setSearch] = useState("");
 
-  // Deleted project tracking for optimistic UI
-  const [deletedProjectId, setDeletedProjectId] = useState<string | null>(null);
-
-  // Calculate metrics from real API data
-  const activeCount = useMemo(
-    () =>
-      projects?.filter((p) => p.status === "processing").length ?? 0,
-    [projects]
+  const projects = useMemo(
+    () => projectsQuery.data ?? [],
+    [projectsQuery.data],
   );
 
-  const totalClips = useMemo(
-    () => projects?.reduce((sum, p) => sum + (p.clips_count ?? 0), 0) ?? 0,
-    [projects]
-  );
+  const stats = useMemo(() => {
+    const active = projects.filter(
+      (project) => project.status === "processing" || project.status === "queued",
+    ).length;
+    const ready = projects.filter((project) => project.status === "ready").length;
+    const failed = projects.filter((project) => project.status === "failed").length;
+    const clips = projects.reduce(
+      (total, project) => total + project.clips_count,
+      0,
+    );
+    return { total: projects.length, active, ready, failed, clips };
+  }, [projects]);
 
-  const scheduledToday = useMemo(() => {
-    // Use health check data if available, otherwise estimate from projects
-    if (health?.checks) {
-      const storageCheck = health.checks.find((c) => c.name === "storage");
-      return storageCheck ? 1 : 0;
-    }
-    return 0;
-  }, [health]);
-
-  // Filter projects
   const filtered = useMemo(() => {
-    if (!projects) return [];
+    const term = search.trim().toLowerCase();
     return projects.filter((project) => {
-      if (statusFilter !== "all" && project.status !== statusFilter) return false;
-      if (langFilter !== "all" && project.language !== langFilter) return false;
+      if (statusFilter !== "all") {
+        const matchesStatus =
+          statusFilter === "processing"
+            ? project.status === "processing" || project.status === "queued"
+            : project.status === statusFilter;
+        if (!matchesStatus) return false;
+      }
+      if (languageFilter !== "all") {
+        if (project.language.toLowerCase() !== languageFilter) return false;
+      }
+      if (term && !project.title.toLowerCase().includes(term)) return false;
       return true;
     });
-  }, [projects, statusFilter, langFilter]);
+  }, [projects, statusFilter, languageFilter, search]);
 
-  // Filter out deleted project from the list
-  const activeProjects = filtered.filter(
-    (project) => project.id !== deletedProjectId
-  );
-
-  // Handle SSE project updates (invalidate cache)
-  const handleProjectUpdate = (projectId: string) => {
-    queryClient.invalidateQueries({ queryKey: ["projects"] });
-  };
-
-  // Handle project deletion completion
-  const handleDeleteSuccess = (projectId: string) => {
-    setDeletedProjectId(projectId);
-    queryClient.invalidateQueries({ queryKey: ["projects"] });
-  };
-
-  if (isLoading) {
+  if (projectsQuery.isLoading) {
     return (
-      <div className="max-w-[1440px] mx-auto space-y-6">
-        {/* Metrics skeleton */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 bg-[#111114] border border-white/[0.08] rounded-lg divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]">
-          <div className="px-5 py-4">
-            <p className="text-[12px] text-zinc-400">Proyectos activos</p>
-            <div className="h-8 w-16 bg-white/[0.08] rounded mt-1" />
-          </div>
-          <div className="px-5 py-4">
-            <p className="text-[12px] text-zinc-400">Clips generados</p>
-            <div className="h-8 w-16 bg-white/[0.08] rounded mt-1" />
-          </div>
-          <div className="px-5 py-4">
-            <p className="text-[12px] text-zinc-400">Programados hoy</p>
-            <div className="h-8 w-16 bg-white/[0.08] rounded mt-1" />
-          </div>
-        </section>
-
-        {/* Filter skeleton */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="w-20 h-8 bg-white/[0.08] rounded" />
-            <div className="w-16 h-8 bg-white/[0.08] rounded" />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-8 bg-white/[0.08] rounded" />
-            <div className="w-10 h-8 bg-white/[0.08] rounded" />
-          </div>
+      <div className="space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-[92px] rounded-xl" />
+          ))}
         </div>
-
-        {/* Card skeletons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-[#111114] border border-white/[0.08] rounded-lg overflow-hidden animate-pulse"
-            >
-              <div className="aspect-video bg-zinc-800" />
-              <div className="p-4 space-y-2">
-                <div className="h-5 bg-white/[0.08] rounded" />
-                <div className="h-3 bg-white/[0.08] rounded w-3/4" />
-                <div className="h-3 bg-white/[0.08] rounded w-1/2" />
-              </div>
-            </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-[320px] rounded-xl" />
           ))}
         </div>
       </div>
     );
   }
 
-  if (isError) {
+  if (projectsQuery.isError) {
     return (
-      <div className="max-w-[1440px] mx-auto">
-        <Alert variant="destructive" className="bg-[#111114] border border-white/[0.08]">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Error al cargar los proyectos.{" "}
-            <Button
-              variant="link"
-              onClick={() => refetch()}
-              className="p-0 h-auto"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Reintentar
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (!activeProjects || activeProjects.length === 0) {
-    return (
-      <div className="max-w-[1440px] mx-auto">
-        {/* Metrics bar for empty state */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 bg-[#111114] border border-white/[0.08] rounded-lg divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]">
-          <div className="px-5 py-4 flex items-baseline justify-between gap-4">
-            <div>
-              <p className="text-[12px] text-zinc-400">Proyectos activos</p>
-              <p className="text-2xl font-bold font-mono tabular-nums text-zinc-50 mt-1">
-                0
-              </p>
-            </div>
-          </div>
-          <div className="px-5 py-4 flex items-baseline justify-between gap-4">
-            <div>
-              <p className="text-[12px] text-zinc-400">Clips generados</p>
-              <p className="text-2xl font-bold font-mono tabular-nums text-zinc-50 mt-1">
-                0
-              </p>
-            </div>
-          </div>
-          <div className="px-5 py-4 flex items-baseline justify-between gap-4">
-            <div>
-              <p className="text-[12px] text-zinc-400">Programados hoy</p>
-              <p className="text-2xl font-bold font-mono tabular-nums text-zinc-50 mt-1">
-                0
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Empty state */}
-        <div className="bg-[#111114] border border-white/[0.08] rounded-lg py-16 px-6 text-center space-y-3 mt-6">
-          <div className="w-11 h-11 rounded-lg bg-white/[0.04] border border-white/[0.08] mx-auto flex items-center justify-center text-zinc-400">
-            <FolderOpen className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-[15px] font-semibold text-zinc-100">
-              No hay proyectos que coincidan
-            </h2>
-            <p className="text-[13px] text-zinc-400 max-w-md mx-auto">
-              Ajusta los filtros activos o crea un nuevo proyecto pegando un
-              enlace de YouTube o subiendo un archivo local.
-            </p>
-          </div>
-          <Link href="/projects/new" className="mt-2 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 h-9 px-4 py-2 bg-amber-400 hover:bg-amber-300 text-zinc-950">
-            <Play className="w-4 h-4" />
-            <span>Nuevo proyecto</span>
-          </Link>
+      <Alert variant="destructive">
+        <AlertCircle aria-hidden="true" />
+        <AlertDescription>
+          <span className="block font-medium">
+            No se pudieron cargar los proyectos
+          </span>
+          {errorMessage(projectsQuery.error)}. Comprueba que la API esté levantada
+          con <code>pnpm dev</code>.
+        </AlertDescription>
+        <div className="mt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void projectsQuery.refetch()}
+          >
+            <RefreshCw aria-hidden="true" />
+            Reintentar
+          </Button>
         </div>
-      </div>
+      </Alert>
     );
   }
 
   return (
-    <div className="max-w-[1440px] mx-auto space-y-6">
-      {/* Top Quick Stats Strip */}
+    <div className="space-y-6">
       <section
         aria-label="Resumen del estudio"
-        className="grid grid-cols-1 sm:grid-cols-3 bg-[#111114] border border-white/[0.08] rounded-lg divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]"
+        className="grid grid-cols-1 divide-y divide-white/[0.08] rounded-xl border border-white/[0.08] bg-[#111114] sm:grid-cols-3 sm:divide-x sm:divide-y-0"
       >
-        <div className="px-5 py-4 flex items-baseline justify-between gap-4">
+        <div className="flex items-baseline justify-between gap-4 px-5 py-4">
           <div>
-            <p className="text-[12px] text-zinc-400">Proyectos activos</p>
-            <p className="text-2xl font-bold font-mono tabular-nums text-zinc-50 mt-1">
-              {projects?.length ?? 0}
+            <p className="text-xs text-zinc-400">Proyectos activos</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-zinc-50">
+              {stats.total}
             </p>
           </div>
-          <span className="text-[12px] font-mono tabular-nums text-amber-400">
-            {activeCount > 0 ? `${activeCount} procesando` : "Cola libre"}
+          <span className="font-mono text-xs tabular-nums text-amber-400">
+            {stats.active > 0 ? `${stats.active} procesando` : "Cola libre"}
           </span>
         </div>
 
-        <div className="px-5 py-4 flex items-baseline justify-between gap-4">
+        <div className="flex items-baseline justify-between gap-4 px-5 py-4">
           <div>
-            <p className="text-[12px] text-zinc-400">Clips generados</p>
-            <p className="text-2xl font-bold font-mono tabular-nums text-zinc-50 mt-1">
-              {totalClips}
+            <p className="text-xs text-zinc-400">Clips generados</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-zinc-50">
+              {stats.clips}
             </p>
           </div>
-          <span className="text-[12px] font-mono tabular-nums text-emerald-400">
+          <span className="font-mono text-xs tabular-nums text-emerald-400">
             9:16 listos
           </span>
         </div>
 
-        <div className="px-5 py-4 flex items-baseline justify-between gap-4">
+        <div className="flex items-baseline justify-between gap-4 px-5 py-4">
           <div>
-            <p className="text-[12px] text-zinc-400">Programados hoy</p>
-            <p className="text-2xl font-bold font-mono tabular-nums text-zinc-50 mt-1">
-              {scheduledToday}
+            <p className="text-xs text-zinc-400">Completados</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-zinc-50">
+              {stats.ready}
             </p>
           </div>
-          <Link
-            href="/publications"
-            className="text-[12px] text-zinc-400 hover:text-amber-300 inline-flex items-center gap-1 transition-colors whitespace-nowrap"
+          <span
+            className={cn(
+              "font-mono text-xs tabular-nums",
+              stats.failed > 0 ? "text-rose-400" : "text-zinc-400",
+            )}
           >
-            <span>Ver cola</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 8l4 4m0 0l-4 4m4-4H3"
-              />
-            </svg>
-          </Link>
+            {stats.failed > 0
+              ? `${stats.failed} con error`
+              : "Listos para revisar"}
+          </span>
         </div>
       </section>
 
-      {/* Filter & View Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#0d0d10] p-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Status filter tabs */}
-          <div className="inline-flex items-center p-0.5 rounded-md bg-[#111114] border border-white/[0.08]">
-            {(
-              [
-                { id: "all", label: "Todos" },
-                { id: "processing", label: "En proceso" },
-                { id: "ready", label: "Completados" },
-              ] as const
-            ).map((tab) => (
+          <div className="relative min-w-[180px] flex-1 lg:max-w-xs">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-500"
+              aria-hidden="true"
+            />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar proyectos…"
+              aria-label="Buscar proyectos"
+              className="pl-8"
+            />
+          </div>
+
+          <div className="flex rounded-lg border border-white/10 p-0.5">
+            {STATUS_FILTERS.map((filter) => (
               <button
-                key={tab.id}
+                key={filter.id}
                 type="button"
-                onClick={() => setStatusFilter(tab.id)}
-                className={`px-3 py-1.5 text-[12px] font-medium rounded-[5px] transition-colors whitespace-nowrap ${
-                  statusFilter === tab.id
-                    ? "bg-white/[0.1] text-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
+                onClick={() => setStatusFilter(filter.id)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                  statusFilter === filter.id
+                    ? "bg-white/10 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300",
+                )}
               >
-                {tab.label}
+                {filter.label}
               </button>
             ))}
           </div>
 
-          {/* Language filter tabs */}
-          <div className="inline-flex items-center p-0.5 rounded-md bg-[#111114] border border-white/[0.08]">
-            {(["all", "ES", "EN"] as const).map((lang) => (
+          <div className="flex rounded-lg border border-white/10 p-0.5">
+            {(["all", "es", "en"] as const).map((language) => (
               <button
-                key={lang}
+                key={language}
                 type="button"
-                onClick={() => setLangFilter(lang)}
-                className={`px-2.5 py-1.5 text-[12px] font-mono rounded-[5px] transition-colors whitespace-nowrap ${
-                  langFilter === lang
-                    ? "bg-white/[0.1] text-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
+                onClick={() => setLanguageFilter(language)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs font-medium uppercase transition-colors",
+                  languageFilter === language
+                    ? "bg-white/10 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300",
+                )}
               >
-                {lang === "all" ? "ES/EN" : lang}
+                {language === "all" ? "Todos" : language.toUpperCase()}
               </button>
             ))}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[12px] text-zinc-500 font-mono tabular-nums mr-1">
-            {activeProjects.length} {activeProjects.length === 1 ? "proyecto" : "proyectos"}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 text-xs",
+              connected ? "text-emerald-400" : "text-zinc-500",
+            )}
+            title={
+              connected
+                ? "Eventos en vivo conectados"
+                : "Sin conexión SSE; reintentando"
+            }
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                connected ? "bg-emerald-400" : "bg-zinc-600",
+              )}
+              aria-hidden="true"
+            />
+            {connected ? "En vivo" : "Sin conexión"}
           </span>
 
-          {/* View mode toggle */}
-          <div className="inline-flex items-center p-0.5 rounded-md bg-[#111114] border border-white/[0.08]">
+          <div className="flex rounded-lg border border-white/10 p-0.5">
             <button
               type="button"
+              aria-label="Vista de cuadrícula"
               onClick={() => setViewMode("grid")}
-              aria-label="Vista cuadrícula"
-              className={`p-1.5 rounded-[5px] transition-colors ${
+              className={cn(
+                "rounded-md p-1.5",
                 viewMode === "grid"
-                  ? "bg-white/[0.1] text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-200"
-              }`}
+                  ? "bg-white/10 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300",
+              )}
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="size-4" aria-hidden="true" />
             </button>
             <button
               type="button"
+              aria-label="Vista de lista"
               onClick={() => setViewMode("list")}
-              aria-label="Vista lista"
-              className={`p-1.5 rounded-[5px] transition-colors ${
+              className={cn(
+                "rounded-md p-1.5",
                 viewMode === "list"
-                  ? "bg-white/[0.1] text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-200"
-              }`}
+                  ? "bg-white/10 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300",
+              )}
             >
-              <List className="w-4 h-4" />
+              <List className="size-4" aria-hidden="true" />
             </button>
           </div>
+
+          <Button asChild size="sm">
+            <Link href="/projects/new">
+              <Plus aria-hidden="true" />
+              Nuevo proyecto
+            </Link>
+          </Button>
         </div>
       </div>
 
-      {/* Project grid or list */}
-      {viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {activeProjects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onDelete={handleDeleteSuccess}
-              onUpdate={handleProjectUpdate}
-            />
-          ))}
+      {projects.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/10 bg-[#0d0d10] px-6 py-16 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-400">
+            <FolderOpen className="size-6" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-zinc-100">
+              Aún no hay proyectos
+            </p>
+            <p className="mt-1 max-w-md text-sm text-zinc-500">
+              Pega una URL de YouTube o sube un archivo para generar tus primeros
+              shorts verticales con subtítulos.
+            </p>
+          </div>
+          <Button asChild className="mt-1">
+            <Link href="/projects/new">
+              <Sparkles aria-hidden="true" />
+              Crear el primero
+            </Link>
+          </Button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#0d0d10] px-6 py-14 text-center">
+          <p className="text-sm font-medium text-zinc-200">
+            Ningún proyecto coincide con los filtros
+          </p>
+          <p className="text-xs text-zinc-500">
+            Prueba a cambiar el estado, el idioma o la búsqueda.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={() => {
+              setStatusFilter("all");
+              setLanguageFilter("all");
+              setSearch("");
+            }}
+          >
+            Limpiar filtros
+          </Button>
         </div>
       ) : (
-        <div className="bg-[#111114] border border-white/[0.08] rounded-lg divide-y divide-white/[0.06] overflow-hidden">
-          {activeProjects.map((project) => (
-            <div
-              key={project.id}
-              className="flex items-center gap-4 px-4 py-3 hover:bg-white/[0.03] transition-colors"
-            >
-              <div className="relative w-32 aspect-video rounded-md overflow-hidden bg-zinc-900 shrink-0 border border-white/[0.08]">
-                {project.thumb_url ? (
-                  <img
-                    src={project.thumb_url}
-                    alt={project.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <Film className="w-7 h-7 text-zinc-500" />
-                  </div>
-                )}
-                <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono tabular-nums text-zinc-100">
-                  {project.duration
-                    ? `${Math.floor(project.duration / 60)}:${String(
-                        project.duration % 60
-                      ).padStart(2, "0")}`
-                    : "--:--"}
-                </span>
-              </div>
-
-              <div className="min-w-0 flex-1 space-y-1">
-                <h3 className="text-[14px] font-semibold text-zinc-100">
-                  {project.title}
-                </h3>
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-zinc-400">
-                  <span className="inline-flex items-center gap-1 text-zinc-300">
-                    {project.source_type === "url" ? (
-                      <Video className="w-3.5 h-3.5 text-rose-400" />
-                    ) : (
-                      <HardDrive className="w-3.5 h-3.5 text-sky-400" />
-                    )}
-                    {project.source_type === "url"
-                      ? "YouTube"
-                      : "Archivo local"}
-                  </span>
-                  <span aria-hidden="true" className="text-zinc-600">
-                    ·
-                  </span>
-                  <span className="font-mono text-zinc-300">
-                    {project.language}
-                  </span>
-                  <span aria-hidden="true" className="text-zinc-600">
-                    ·
-                  </span>
-                  <span>{project.campaign_id ?? "Sin campaña"}</span>
-                  <span aria-hidden="true" className="text-zinc-600">
-                    ·
-                  </span>
-                  <span className="text-zinc-500">
-                    {formatDate(project.created_at)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="shrink-0 w-44 text-right space-y-1.5">
-                {project.status === "processing" ? (
-                  <>
-                    <div className="flex items-center justify-end gap-1.5 text-[12px] font-mono text-cyan-300">
-                      <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      <span>Procesando</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-white/[0.08] overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-cyan-400 to-amber-400 rounded-full transition-all duration-300"
-                        style={{
-                          width: `${calculatePipelineProgress(
-                            project.active_job,
-                            project.jobs
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-end gap-3">
-                    <span className="text-[12px] font-mono tabular-nums text-zinc-200">
-                      {project.clips_count ?? 0} clips
-                    </span>
-                    <span className="text-[12px] text-emerald-400">Listo</span>
-                  </div>
-                )}
-              </div>
-            </div>
+        <div
+          className={cn(
+            viewMode === "grid"
+              ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              : "flex flex-col gap-2",
+          )}
+        >
+          {filtered.map((project) => (
+            <ProjectCard key={project.id} project={project} variant={viewMode} />
           ))}
         </div>
       )}
+
+      {projectsQuery.isFetching && !projectsQuery.isLoading ? (
+        <p className="flex items-center justify-center gap-2 text-xs text-zinc-600">
+          <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+          Actualizando…
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1,42 +1,108 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-pulse-custom: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+}
+
+:root {
+  --radius: 0.5rem;
+  /* Tema oscuro por defecto (estética desktop studio densa y sobria) */
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #111114;
+  --card-foreground: #fafafa;
+  --popover: #111114;
+  --popover-foreground: #fafafa;
+  --primary: #f59e0b;
+  --primary-foreground: #09090b;
+  --secondary: #0d0d10;
+  --secondary-foreground: #fafafa;
+  --muted: #18181b;
+  --muted-foreground: #71717a;
+  --accent: #f59e0b;
+  --accent-foreground: #09090b;
+  --destructive: #f43f5e;
+  --destructive-foreground: #fafafa;
+  --success: #10b981;
+  --success-foreground: #09090b;
+  --warning: #f59e0b;
+  --warning-foreground: #09090b;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: rgba(245, 158, 11, 0.6);
+  --sidebar: #0d0d10;
+  --sidebar-foreground: #fafafa;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+}
 
 @layer base {
-  /* Custom dark theme variables */
-  :root {
-    --radius: 0.5rem;
-    /* Tema oscuro por defecto (estética desktop studio densa y sobria) */
-    --background: #09090B;      /* zinc-950 - Lienzo principal */
-    --foreground: #FAFAFA;      /* zinc-50 */
-    --card: #111114;            /* zinc-900/950 - Tarjetas y modales */
-    --card-foreground: #FAFAFA;
-    --popover: #111114;
-    --popover-foreground: #FAFAFA;
-    --primary: #F59E0B;         /* amber-500 - Primario (CTA y resaltado activo) */
-    --primary-foreground: #09090B;
-    --secondary: #0D0D10;       /* zinc-950 - Sidebar / encabezados de tabla */
-    --secondary-foreground: #FAFAFA;
-    --muted: #18181B;           /* zinc-900 - Elevado */
-    --muted-foreground: #71717A; /* zinc-500 */
-    --accent: #F59E0B;          /* amber-500 - Acento ámbar */
-    --accent-foreground: #09090B;
-    --destructive: #F43F5E;     /* rose-500 */
-    --destructive-foreground: #FAFAFA;
-    --success: #10B981;         /* emerald-500 - Éxito / listo / score ≥ 90 */
-    --success-foreground: #09090B;
-    --warning: #F59E0B;         /* amber-500 */
-    --warning-foreground: #09090B;
-    --border: rgba(255, 255, 255, 0.08);
-    --input: rgba(255, 255, 255, 0.12);
-    --ring: rgba(245, 158, 11, 0.6); /* amber-400/60 */
-    --sidebar: #0D0D10;         /* Sidebar / encabezados de tabla */
-    --sidebar-foreground: #FAFAFA;
-    --sidebar-border: rgba(255, 255, 255, 0.08);
+  * {
+    border-color: var(--border);
+    outline-color: var(--ring);
   }
 
   html {
-    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01";
   }
 
@@ -54,18 +120,32 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--background);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--muted);
-    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--muted-foreground);
+    background: rgba(255, 255, 255, 0.22);
   }
 
+  /* Respetar prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
   /* Sliders estilo estudio con thumb ámbar */
   .studio-slider {
     -webkit-appearance: none;
@@ -83,13 +163,15 @@
     border-radius: 50%;
     background: var(--primary);
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
     border: 2px solid var(--background);
   }
 
   .studio-slider::-webkit-slider-thumb:hover {
     transform: scale(1.15);
-    box-shadow: 0 0 0 3px var(--primary)/30;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
   }
 
   .studio-slider::-moz-range-thumb {
@@ -100,87 +182,41 @@
     cursor: pointer;
     border: 2px solid var(--background);
   }
-
-  /* Respetar prefers-reduced-motion */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
 }
 
-/* Border and outline defaults */
-@layer base {
-  * {
-    border-color: var(--border);
-    outline-color: var(--ring);
-  }
-}
-
-/* Focus visible para accesibilidad */
 @layer utilities {
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
-  .animate-fade-in {
-    animation: fade-in 0.2s ease-out;
+  .elevated-1 {
+    background-color: var(--card);
   }
 
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .elevated-2 {
+    background-color: var(--muted);
   }
 
-  .animate-pulse-custom {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  .elevated-3 {
+    background-color: rgba(24, 24, 27, 0.5);
   }
 
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.5;
-    }
+  .caption-stroke {
+    text-shadow:
+      -1.5px -1.5px 0 #000,
+      1.5px -1.5px 0 #000,
+      -1.5px 1.5px 0 #000,
+      1.5px 1.5px 0 #000,
+      0 2px 4px rgba(0, 0, 0, 0.85);
   }
 
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  .caption-stroke-heavy {
+    text-shadow:
+      -2px -2px 0 #000,
+      2px -2px 0 #000,
+      -2px 2px 0 #000,
+      2px 2px 0 #000,
+      0 3px 6px rgba(0, 0, 0, 0.95);
   }
-
-  .line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-}
-
-/* Card elevation utilities */
-.elevated-1 {
-  background-color: var(--card);
-}
-
-.elevated-2 {
-  background-color: var(--muted);
-}
-
-.elevated-3 {
-  background-color: rgba(24, 24, 27, 0.5);
 }

@@ -1,25 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
-  Play,
-  Video,
-  HardDrive,
-  Trash2,
-  MoreHorizontal,
-  Loader2,
   AlertCircle,
+  CheckCircle2,
+  Clock,
+  Film,
+  Loader2,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
   CardFooter,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,292 +37,264 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useProjectClips, useProjectEvents } from "@/hooks/use-api-client";
+import { Progress } from "@/components/ui/progress";
 import { useDeleteProject } from "@/hooks/use-projects";
-import { useQueryClient } from "@tanstack/react-query";
-import type { components } from "@winclip/api-client";
+import { errorMessage, mediaUrl } from "@/lib/api";
+import { formatDate, formatDuration, stageLabel, statusLabel } from "@/lib/format";
+import type { ProjectOut } from "@winclip/api-client";
 
-type ProjectCardProps = {
-  project: components["schemas"]["ProjectOut"];
-  onDelete?: (projectId: string) => void;
-  onUpdate?: (projectId: string) => void;
+const STATUS_STYLES: Record<
+  string,
+  { className: string; icon: typeof CheckCircle2 }
+> = {
+  ready: {
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+    icon: CheckCircle2,
+  },
+  processing: {
+    className: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+    icon: Loader2,
+  },
+  queued: {
+    className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+    icon: Clock,
+  },
+  failed: {
+    className: "border-rose-500/30 bg-rose-500/10 text-rose-400",
+    icon: AlertCircle,
+  },
 };
 
-export function ProjectCard({
-  project,
-  onDelete,
-  onUpdate,
-}: ProjectCardProps) {
-  const { status, thumb_url, title, id, active_job, latest_job, language, clips_count } =
-    project;
+const QUEUED_STYLE = {
+  className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+  icon: Clock,
+};
 
-  const deleteMutation = useDeleteProject();
-  const clipsQuery = useProjectClips(id);
-  const queryClient = useQueryClient();
-
-  // Track deletion state for optimistic UI
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-
-  // SSE event handling for project updates
-  interface ProjectEvent {
-    type: string;
-    data?: Record<string, unknown>;
-    error?: string | null;
-  }
-  const [projectEvents, setProjectEvents] = useState<
-    Map<string, ProjectEvent>
-  >(new Map());
-
-  const handleEvent = (event: ProjectEvent) => {
-    setProjectEvents((prev) => {
-      const next = new Map(prev);
-      next.set(id, event);
-      return next;
-    });
-    onUpdate?.(id);
-  };
-
-  // Initialize SSE connection for project-specific events
-  useProjectEvents(
-    status === "processing" ? id : null,
-    handleEvent
+export function StatusBadge({ status }: { status: string }) {
+  const meta = STATUS_STYLES[status] ?? QUEUED_STYLE;
+  const Icon = meta.icon;
+  return (
+    <Badge variant="outline" className={meta.className}>
+      <Icon
+        className={status === "processing" ? "animate-spin" : undefined}
+        aria-hidden="true"
+      />
+      {statusLabel(status)}
+    </Badge>
   );
+}
 
-  // Merge SSE data with project data
-  const eventData = projectEvents.get(id);
-  const effectiveProgress = eventData?.type === "job.progress"
-    ? typeof eventData.data?.progress === "number" ? eventData.data.progress : 0
-    : (active_job?.progress ?? 0);
+export interface ProjectCardProps {
+  project: ProjectOut;
+  variant?: "grid" | "list";
+}
 
-  const effectiveStage = eventData?.type === "job.progress"
-    ? (eventData.data?.stage as string | undefined)
-    : (active_job?.stage);
+export function ProjectCard({ project, variant = "grid" }: ProjectCardProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteProject = useDeleteProject();
+  const thumb = mediaUrl(project.thumb_url, project.updated_at);
+  const activeJob = project.active_job;
+  const progress = activeJob?.progress ?? project.latest_job?.progress ?? 0;
+  const isBusy = project.status === "processing" || project.status === "queued";
 
-  // Get source type display
-  const sourceType = project.source_type || "local";
-  const isYouTube = sourceType === "url";
-  const sourceLabel = isYouTube ? "YouTube" : "Archivo local";
-
-  // Get clip count
-  const clipCount = clipsQuery.data?.length ?? project.clips_count ?? 0;
-
-  // Determine if project is processing
-  const isActiveJob = active_job || latest_job;
-  const isProcessing = status === "processing" || eventData?.type === "job.progress";
-
-  // Handle delete
-  const handleDelete = async () => {
-    setPendingDeleteId(id);
-    try {
-      await deleteMutation.mutateAsync(id);
-      onDelete?.(id);
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-    } finally {
-      setPendingDeleteId(null);
-    }
+  const handleDelete = () => {
+    deleteProject.mutate(project.id, {
+      onSuccess: () => {
+        setConfirmOpen(false);
+        toast.success("Proyecto eliminado");
+      },
+      onError: (error) => {
+        toast.error("No se pudo eliminar el proyecto", {
+          description: errorMessage(error),
+        });
+      },
+    });
   };
 
-  // Error state from SSE or job
-  const hasError = isActiveJob?.error || eventData?.type === "job.failed";
-  const errorMessage = eventData?.error || isActiveJob?.error;
+  if (variant === "list") {
+    return (
+      <Card className="flex flex-row items-center gap-4 p-3">
+        <Link
+          href={`/projects/${project.id}`}
+          className="relative h-16 w-28 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40"
+        >
+          {thumb ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumb}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-zinc-600">
+              <Film className="size-5" aria-hidden="true" />
+            </div>
+          )}
+        </Link>
 
-  // Format duration
-  const duration = project.duration;
-  const durationLabel =
-    duration !== undefined && duration !== null && duration > 0
-      ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, "0")}`
-      : "--:--";
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/projects/${project.id}`}
+            className="truncate text-sm font-semibold text-zinc-100 hover:text-amber-400"
+          >
+            {project.title}
+          </Link>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+            <StatusBadge status={project.status} />
+            <span>{project.clips_count} clips</span>
+            <span aria-hidden="true">·</span>
+            <span>{formatDuration(project.duration)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{formatDate(project.created_at)}</span>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Eliminar ${project.title}`}
+          onClick={() => setConfirmOpen(true)}
+        >
+          <Trash2 className="size-4 text-zinc-500" aria-hidden="true" />
+        </Button>
+
+        {renderDeleteDialog()}
+      </Card>
+    );
+  }
+
+  function renderDeleteDialog() {
+    return (
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este proyecto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borrarán «{project.title}», sus clips y los archivos generados. Esta
+              acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteProject.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteProject.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                handleDelete();
+              }}
+            >
+              {deleteProject.isPending ? "Eliminando…" : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
 
   return (
-    <Card className="group relative overflow-hidden border-border bg-card text-card-foreground">
-      {/* Error state overlay */}
-      {hasError && (
-        <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center">
-          <div className="text-center space-y-2 p-4">
-            <AlertCircle className="w-8 h-8 text-rose-400 mx-auto" />
-            <p className="text-sm text-rose-300">Error de procesamiento</p>
-            <p className="text-xs text-zinc-400">{errorMessage}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Thumbnail */}
-      <div className="relative aspect-video w-full overflow-hidden bg-zinc-900">
-        {thumb_url && !hasError ? (
+    <Card className="group flex h-full flex-col overflow-hidden transition-colors hover:border-white/20">
+      <Link
+        href={`/projects/${project.id}`}
+        className="relative block aspect-video overflow-hidden bg-gradient-to-br from-zinc-900 to-zinc-950"
+      >
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={thumb_url}
-            alt={title}
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
+            src={thumb}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            loading="lazy"
           />
-        ) : hasError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-rose-400" />
-          </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <HardDrive className="w-7 h-7 text-zinc-500" />
+            <Film className="size-10 text-zinc-700" aria-hidden="true" />
           </div>
         )}
-
-        {/* Top row: Source badge + Language pill */}
-        {!hasError && (
-          <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between gap-2 pointer-events-none">
-            {/* Source badge */}
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/72 backdrop-blur-sm border border-white/10 text-[11px] font-medium text-zinc-100">
-              {isYouTube ? (
-                <Video className="w-3.5 h-3.5 text-rose-400" />
-              ) : (
-                <HardDrive className="w-3.5 h-3.5 text-sky-400" />
-              )}
-              <span>{sourceLabel}</span>
-            </span>
-
-            {/* Language pill */}
-            <span className="px-1.5 py-0.5 rounded bg-black/72 backdrop-blur-sm border border-white/10 text-[11px] font-mono font-semibold text-zinc-200">
-              {language}
-            </span>
-          </div>
-        )}
-
-        {/* Bottom row: Clip count + Duration */}
-        {!hasError && (
-          <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between gap-2 pointer-events-none">
-            {/* Clip count with Play icon */}
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/75 backdrop-blur-sm text-[11px] font-mono tabular-nums text-amber-300">
-              <Play className="w-3 h-3 fill-current" />
-              <span>{clipCount} clips</span>
-            </span>
-            {/* Duration */}
-            <span className="px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono tabular-nums text-zinc-100">
-              {durationLabel}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Card body */}
-      <CardHeader className="flex flex-row items-start justify-between p-4">
-        <div className="space-y-1">
-          <h3 className="text-sm font-medium leading-none">
-            <Link
-              href={`/projects/${id}`}
-              className="hover:text-amber-300 transition-colors"
-            >
-              {title}
-            </Link>
-          </h3>
-          <p className="text-xs text-muted-foreground line-clamp-2">
-            {project.campaign_id ?? "Sin campaña"}
-          </p>
+        <div className="absolute left-3 top-3">
+          <StatusBadge status={project.status} />
         </div>
+        {project.duration ? (
+          <span className="absolute bottom-3 right-3 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-zinc-200">
+            {formatDuration(project.duration)}
+          </span>
+        ) : null}
+      </Link>
 
-        <AlertDialog
-          open={pendingDeleteId === id}
-          onOpenChange={(open) => {
-            if (!open) setPendingDeleteId(null);
-          }}
-        >
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+      <CardHeader className="gap-1 pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="min-w-0">
+            <Link
+              href={`/projects/${project.id}`}
+              className="line-clamp-2 text-base leading-snug hover:text-amber-400"
             >
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Abrir menú</span>
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="bg-[#111114] border border-white/[0.08]">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Eliminar proyecto</AlertDialogTitle>
-              <AlertDialogDescription>
-                ¿Estás seguro de que quieres eliminar el proyecto &quot;
-                {title}&quot;? Esta acción no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="bg-rose-500 hover:bg-rose-600 text-white"
+              {project.title}
+            </Link>
+          </CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Acciones de ${project.title}`}
               >
-                {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <MoreHorizontal className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-rose-400 focus:text-rose-300"
+                onSelect={() => setConfirmOpen(true)}
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+                Eliminar proyecto
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </CardHeader>
 
-      <CardContent className="p-4 pt-0">
-        {/* Progress bar for processing projects */}
-        {isProcessing && !hasError && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-cyan-300 font-medium">
-                {effectiveStage ?? "Procesando..."}
+      <CardContent className="flex-1 space-y-3 pb-2">
+        {isBusy ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-zinc-400">
+              <span className="truncate">
+                {activeJob?.stage ? stageLabel(activeJob.stage) : "En cola"}
               </span>
-              <span className="font-mono text-foreground">
-                {effectiveProgress}%
+              <span className="font-mono tabular-nums">
+                {Math.round(progress)}%
               </span>
             </div>
-            <Progress value={effectiveProgress} className="h-1.5" />
+            <Progress value={progress} className="h-1.5" />
           </div>
-        )}
-
-        {/* Status badge */}
-        <div className="mt-3">
-          <Badge
-            variant={
-              status === "ready"
-                ? "default"
-                : status === "failed"
-                  ? "destructive"
-                  : "outline"
-            }
-            className={
-              status === "ready"
-                ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/20"
-                : status === "failed"
-                  ? "bg-rose-500/10 text-rose-400 border-rose-400/20"
-                  : "bg-cyan-400/10 text-cyan-400 border-cyan-400/20"
-            }
-          >
-            {status === "ready"
-              ? "Listo"
-              : status === "failed"
-                ? "Error"
-                : status === "processing"
-                  ? "Procesando"
-                  : "Pendiente"}
-            {hasError && (
-              <AlertCircle className="w-3 h-3 ml-1" />
-            )}
-          </Badge>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+          <span className="inline-flex items-center gap-1">
+            <Film className="size-3.5" aria-hidden="true" />
+            {project.clips_count} clips
+          </span>
+          <span className="uppercase">{project.language}</span>
+          <span>{project.source_type === "url" ? "URL" : "Archivo"}</span>
         </div>
       </CardContent>
 
-      {/* Footer for ready projects */}
-      {!isProcessing && !hasError && (
-        <CardFooter className="border-t border-white/[0.06] p-4 pt-0">
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span className="font-mono truncate max-w-[60%]">
-              {project.source_url || project.thumb_url || "Sin contenido"}
-            </span>
-            <Link
-              href={`/projects/${id}`}
-              className="text-emerald-400 hover:text-emerald-300 font-medium"
-            >
-              Ver detalles →
-            </Link>
-          </div>
-        </CardFooter>
-      )}
+      <CardFooter className="justify-between border-t border-white/5 pt-3 text-xs text-zinc-500">
+        <span>{formatDate(project.created_at)}</span>
+        <Link
+          href={`/projects/${project.id}`}
+          className="font-medium text-amber-400 hover:text-amber-300"
+        >
+          Abrir →
+        </Link>
+      </CardFooter>
+
+      {renderDeleteDialog()}
     </Card>
   );
 }

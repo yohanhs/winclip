@@ -1,14 +1,25 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Video,
+  ArrowRight,
+  Film,
+  Layers,
+  Link2,
+  Loader2,
+  Maximize2,
+  ScanFace,
+  Sparkles,
   Upload,
-  ChevronDown,
+  Users,
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,507 +27,461 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCreateProject, usePresets } from "@/hooks/use-projects";
+import { errorMessage } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { FileDropzone } from "./file-dropzone";
-import { SubtitlePresetPreview } from "./subtitle-preset-preview";
-import { useCreateProject } from "@/hooks/use-projects";
-import { usePresets } from "@/hooks/use-api-client";
-import type { components } from "@winclip/api-client";
+import {
+  PRESET_STYLES,
+  SubtitlePresetPreview,
+} from "./subtitle-preset-preview";
 
-type CaptionPreset = "bold_yellow" | "hormozi" | "clean_white" | "mrbeast";
+type SourceType = "url" | "file";
+type Language = "auto" | "es" | "en";
+type ReframeMode = "face" | "center" | "blur" | "passthrough";
 
-type ReframeMode = "face_track" | "center" | "blur_bg" | "passthrough";
+const PRESET_IDS = ["bold-yellow", "hormozi", "clean-white", "mrbeast"] as const;
 
-// API reframe mode type
-type ApiReframeMode = "face" | "center" | "blur" | "passthrough";
-
-// Type for requested_clips parameter
-type RequestedClips = number | "max";
-
-interface ProjectCreateFormProps {
-  campaigns?: Array<{
-    id: string;
-    name: string;
-    language: string;
-    maxClips: number;
-    hookSeconds: number;
-    forbiddenWords: string[];
-    cta: string;
-  }>;
-  className?: string;
-}
-
-// Preset styling metadata
-const PRESET_STYLES: Record<
-  CaptionPreset,
-  { name: string; subtitle: string; swatch: string }
-> = {
-  bold_yellow: {
-    name: "Bold Yellow",
-    subtitle: "Karaoke amarillo eléctrico · trazo negro",
-    swatch: "#FFD600",
+const REFRAME_OPTIONS: Array<{
+  id: ReframeMode;
+  label: string;
+  description: string;
+  icon: typeof ScanFace;
+}> = [
+  {
+    id: "face",
+    label: "Cara centrada",
+    description: "OpenCV YuNet sigue al hablante",
+    icon: ScanFace,
   },
-  hormozi: {
-    name: "Hormozi",
-    subtitle: "Alto impacto · palabra activa verde/ámbar",
-    swatch: "#10B981",
+  {
+    id: "center",
+    label: "Centrado",
+    description: "Recorte fijo 9:16",
+    icon: Maximize2,
   },
-  clean_white: {
-    name: "Clean White",
-    subtitle: "Editorial minimalista · pastilla translúcida",
-    swatch: "#F4F4F5",
+  {
+    id: "blur",
+    label: "Fondo blur",
+    description: "Rellena con desenfoque",
+    icon: Layers,
   },
-  mrbeast: {
-    name: "MrBeast",
-    subtitle: "Display condensado · rebote pop en acento",
-    swatch: "#F59E0B",
+  {
+    id: "passthrough",
+    label: "Sin recorte",
+    description: "Vídeo original",
+    icon: Film,
   },
-};
-
-// API preset data type
-type PresetData = components["schemas"]["SubtitlePresetOut"];
-
-// Reframe mode display names
-const REFAME_MODE_OPTIONS: { value: ReframeMode; label: string; description: string }[] = [
-  { value: "face_track", label: "Rostro en movimiento", description: "Enfoca rostros y personas" },
-  { value: "center", label: "Centro automático", description: "Mantiene el centro del frame" },
-  { value: "blur_bg", label: "Fondo desenfocado", description: "Desenfoca el fondo para foco en subjecto" },
-  { value: "passthrough", label: "Sin reframe", description: "Mantiene el video original" },
 ];
 
-// Map UI refame mode to API value
-function mapReframeModeToApi(mode: ReframeMode): ApiReframeMode {
-  const map: Record<ReframeMode, ApiReframeMode> = {
-    face_track: "face",
-    center: "center",
-    blur_bg: "blur",
-    passthrough: "passthrough",
-  };
-  return map[mode] || "face";
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-white/10 bg-[#111114] p-5">
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold text-zinc-100">{title}</h2>
+        {description ? (
+          <p className="mt-0.5 text-xs text-zinc-500">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
 }
 
-// Map API refame mode to UI value
-function mapApiReframeModeToUI(mode: string): ReframeMode {
-  const map: Record<string, ReframeMode> = {
-    face: "face_track",
-    center: "center",
-    blur: "blur_bg",
-    passthrough: "passthrough",
-  };
-  return map[mode] || "face_track";
-}
-
-export function ProjectCreateForm({ campaigns = [], className = "" }: ProjectCreateFormProps) {
-  const [activeTab, setActiveTab] = useState<"url" | "upload">("url");
-  const [url, setUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("");
-  const [clipsCount, setClipsCount] = useState<number>(5);
-  const [language, setLanguage] = useState<"auto" | "es" | "en">("auto");
-  const [campaignId, setCampaignId] = useState<string>("");
-  const [selectedPreset, setSelectedPreset] = useState<CaptionPreset>("bold_yellow");
-  const [reframeMode, setReframeMode] = useState<ReframeMode>("face_track");
-  const [title, setTitle] = useState("");
-
+export function ProjectCreateForm() {
+  const router = useRouter();
   const createProject = useCreateProject();
+  const presetsQuery = usePresets();
 
-  const { data: presets } = usePresets();
+  const [sourceType, setSourceType] = useState<SourceType>("url");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [clipCount, setClipCount] = useState(5);
+  const [maxClips, setMaxClips] = useState(false);
+  const [language, setLanguage] = useState<Language>("auto");
+  const [preset, setPreset] = useState<string>("bold-yellow");
+  const [reframeMode, setReframeMode] = useState<ReframeMode>("face");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Get preset data
-  const presetData = useMemo((): PresetData | null => {
-    if (!presets) return null;
-    const preset = presets.find((p) => p.id === selectedPreset || p.id === "default");
-    if (preset) {
-      return {
-        id: preset.id,
-        name: preset.name,
-        description: preset.description,
-        font: preset.font || "Inter",
-        fallback_font: preset.fallback_font || "Arial",
-        font_size: preset.font_size || 24,
-        uppercase: preset.uppercase || false,
-        primary_color: preset.primary_color || "#FFFFFF",
-        highlight_color: preset.highlight_color || "#FFD600",
-        outline_color: preset.outline_color || "#000000",
-        outline_width: preset.outline_width || 2,
-        shadow_color: preset.shadow_color || "#00000000",
-        shadow_depth: preset.shadow_depth || 0,
-        highlight_scale_pct: preset.highlight_scale_pct || 100,
-        y_pct: preset.y_pct || 85,
-        margin_x: preset.margin_x || 20,
-        max_lines: preset.max_lines || 2,
-        max_chars_per_line: preset.max_chars_per_line || 40,
-        max_words_per_cue: preset.max_words_per_cue || 8,
-        max_pause_sec: preset.max_pause_sec || 2,
-        box_bg_color: preset.box_bg_color || null,
-      };
-    }
-    return null;
-  }, [presets, selectedPreset]);
-
-  // Calculate effective clips count
-  const effectiveClipsCount: RequestedClips = clipsCount === 100 ? "max" : clipsCount;
-
-  // Handle URL submission
-  const handleUrlSubmit = async () => {
-    if (!url.trim() || createProject.isPending) return;
-
-    const params: {
-      source_url: string;
-      title: string;
-      requested_clips: RequestedClips;
-      language: "auto" | "es" | "en";
-      campaign_id?: string;
-      subtitle_preset: string;
-      reframe_mode: ApiReframeMode;
-    } = {
-      source_url: url.trim(),
-      title: title || "Nuevo proyecto",
-      requested_clips: effectiveClipsCount,
-      language: language,
-      subtitle_preset: selectedPreset,
-      reframe_mode: mapReframeModeToApi(reframeMode),
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
     };
+  }, []);
 
-    if (campaignId) params.campaign_id = campaignId;
-
-    await createProject.mutateAsync(params);
+  const handleCancelUpload = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setUploadProgress(0);
   };
 
-  // Handle file upload
-  const handleFileUpload = async (selectedFile: File) => {
-    if (createProject.isPending) return;
-
-    await createProject.mutateAsync({
-      file: selectedFile,
-      title: title || selectedFile.name.replace(/\.[^/.]+$/, ""),
-      requested_clips: effectiveClipsCount,
-      language,
-      campaign_id: campaignId || undefined,
-      subtitle_preset: selectedPreset,
-      reframe_mode: mapReframeModeToApi(reframeMode),
+  const presetOptions = useMemo(() => {
+    const fromApi = presetsQuery.data ?? [];
+    return PRESET_IDS.map((id) => {
+      const apiPreset = fromApi.find((item) => item.id === id);
+      const style = PRESET_STYLES[id];
+      return {
+        id,
+        name: apiPreset?.name ?? style?.name ?? id,
+        description: apiPreset?.description ?? style?.subtitle ?? "",
+        swatch: style?.swatch ?? "#F59E0B",
+        data: apiPreset ?? null,
+      };
     });
-  };
+  }, [presetsQuery.data]);
 
-  // Handle file drop
-  const handleDrop = (selectedFile: File, previewUrl: string) => {
-    setFile(selectedFile);
-    setPreviewUrl(previewUrl);
-  };
+  const selectedPreset = presetOptions.find((option) => option.id === preset);
+  const isPending = createProject.isPending;
+  const canSubmit =
+    sourceType === "url" ? sourceUrl.trim().length > 0 : file !== null;
 
-  // Reset form
-  const resetForm = () => {
-    setUrl("");
-    setTitle("");
-    setFile(null);
-    setPreviewUrl("");
-    setClipsCount(5);
-    setLanguage("auto");
-    setCampaignId("");
-    setSelectedPreset("bold_yellow");
-    setReframeMode("face_track");
-  };
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setUrlError(null);
 
-  // Check if form is valid
-  const isFormValid = activeTab === "url" ? url.trim().length > 0 : file !== null;
+    if (sourceType === "url") {
+      try {
+        const parsed = new URL(sourceUrl.trim());
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          throw new Error("protocolo no soportado");
+        }
+      } catch {
+        const message = "Pega un enlace http(s) a un vídeo o a YouTube.";
+        setUrlError(message);
+        toast.error("URL no válida", {
+          description: message,
+        });
+        return;
+      }
+    }
+    if (sourceType === "file" && !file) {
+      toast.error("Selecciona un archivo de vídeo antes de continuar.");
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    createProject.mutate(
+      {
+        input: {
+          source_url: sourceType === "url" ? sourceUrl.trim() : undefined,
+          file: sourceType === "file" ? file : undefined,
+          title: title.trim() || undefined,
+          requested_clips: maxClips ? "max" : clipCount,
+          language,
+          subtitle_preset: preset,
+          reframe_mode: reframeMode,
+        },
+        onProgress: (progress) => setUploadProgress(progress.percentage),
+        signal: controller.signal,
+      },
+      {
+        onSuccess: (created) => {
+          abortRef.current = null;
+          toast.success("Proyecto creado", {
+            description: "El pipeline ha empezado a procesar el vídeo.",
+          });
+          router.push(`/projects/${created.project.id}`);
+        },
+        onError: (error) => {
+          abortRef.current = null;
+          setUploadProgress(0);
+          if (error instanceof DOMException && error.name === "AbortError") {
+            toast.message("Subida cancelada");
+            return;
+          }
+          toast.error("No se pudo crear el proyecto", {
+            description: errorMessage(error),
+          });
+        },
+      },
+    );
+  };
 
   return (
-    <div className={`flex flex-col gap-6 ${className}`}>
-      {/* Input section */}
-      <section className="bg-[#111114] border border-white/[0.08] rounded-lg p-5 space-y-5">
-        <h2 className="text-[15px] font-semibold text-zinc-100">
-          1. Contenido fuente
-        </h2>
-
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as "url" | "upload")}
-          className="w-full"
-        >
-          <TabsList className="bg-[#09090B] border border-white/[0.08] rounded-lg">
-            <TabsTrigger
-              value="url"
-              className="data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-950"
+    <form onSubmit={handleSubmit}>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-4">
+          <Section
+            title="Origen del vídeo"
+            description="Pega un enlace o sube un archivo local. El vídeo se procesa en tu máquina."
+          >
+            <Tabs
+              value={sourceType}
+              onValueChange={(value) => setSourceType(value as SourceType)}
             >
-              <Video className="w-4 h-4 mr-2" />
-              URL
-            </TabsTrigger>
-            <TabsTrigger
-              value="upload"
-              className="data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-950"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Subir archivo
-            </TabsTrigger>
-          </TabsList>
+              <TabsList className="mb-4 grid w-full grid-cols-2 sm:w-[320px]">
+                <TabsTrigger value="url" disabled={isPending}>
+                  <Link2 className="mr-1.5 size-4" aria-hidden="true" />
+                  URL
+                </TabsTrigger>
+                <TabsTrigger value="file" disabled={isPending}>
+                  <Upload className="mr-1.5 size-4" aria-hidden="true" />
+                  Subir archivo
+                </TabsTrigger>
+              </TabsList>
 
-          {/* URL Tab */}
-          <TabsContent value="url" className="mt-4">
-            <div className="space-y-3">
-              <div>
-                <Label
-                  htmlFor="url-input"
-                  className="text-[13px] font-medium text-zinc-200"
-                >
-                  URL del video
-                </Label>
-                <Input
-                  id="url-input"
-                  type="url"
-                  placeholder="https://youtube.com/watch?v=..."
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="mt-1 bg-[#09090B] border-white/[0.08] text-zinc-100"
-                />
-              </div>
-
-              <div>
-                <Label
-                  htmlFor="title-input"
-                  className="text-[13px] font-medium text-zinc-200"
-                >
-                  Título (opcional)
-                </Label>
-                <Input
-                  id="title-input"
-                  type="text"
-                  placeholder="Título del proyecto"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="mt-1 bg-[#09090B] border-white/[0.08] text-zinc-100"
-                />
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Upload Tab */}
-          <TabsContent value="upload" className="mt-4">
-            <FileDropzone
-              accept="video/*"
-              maxSizeMB={4000}
-              onFileSelected={setFile}
-              onUploadComplete={handleFileUpload}
-              placeholder="Arrastra un video aquí o haz clic para seleccionar"
-            />
-
-            {/* Preview */}
-            {previewUrl && (
-              <div className="mt-4">
-                <Label className="text-[13px] font-medium text-zinc-200">
-                  Vista previa del archivo
-                </Label>
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="mt-2 max-h-[180px] rounded-lg object-contain bg-[#09090B]"
-                />
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </section>
-
-      {/* Clipping Parameters section */}
-      <section className="bg-[#111114] border border-white/[0.08] rounded-lg p-5 space-y-5">
-        <h2 className="text-[15px] font-semibold text-zinc-100">
-          2. Selección IA y reglas de campaña
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Clip Count Slider */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label
-                htmlFor="clip-count-slider"
-                className="text-[13px] font-medium text-zinc-200"
-              >
-                Cantidad de clips
-              </Label>
-              <span className="text-[12px] font-mono text-zinc-300">
-                {clipsCount === 100 ? "Máx" : clipsCount}
-              </span>
-            </div>
-            <Slider
-              id="clip-count-slider"
-              min={1}
-              max={100}
-              step={1}
-              value={[clipsCount]}
-              onValueChange={(v) => setClipsCount(v[0] ?? 5)}
-              className="w-full"
-            />
-            <p className="text-[11px] text-zinc-400">
-              Usa el slider para ajustar cuántos clips generar. El valor máximo es ilimitado.
-            </p>
-          </div>
-
-          {/* Language Selector */}
-          <div className="space-y-2.5">
-            <Label
-              htmlFor="language-select"
-              className="text-[13px] font-medium text-zinc-200"
-            >
-              Idioma
-            </Label>
-            <Select
-              value={language}
-              onValueChange={(v) => setLanguage(v as "auto" | "es" | "en")}
-            >
-              <SelectTrigger className="bg-[#09090B] border-white/[0.08] text-zinc-100">
-                <SelectValue placeholder="Selecciona un idioma" />
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Auto detectar</SelectItem>
-                <SelectItem value="es">Español (ES)</SelectItem>
-                <SelectItem value="en">Inglés (EN)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Campaign Selector */}
-          <div className="space-y-2.5">
-            <Label
-              htmlFor="campaign-select"
-              className="text-[13px] font-medium text-zinc-200"
-            >
-              Campaña (opcional)
-            </Label>
-            <Select value={campaignId} onValueChange={setCampaignId}>
-              <SelectTrigger className="bg-[#09090B] border-white/[0.08] text-zinc-100">
-                <SelectValue placeholder="Sin campaña" />
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </SelectTrigger>
-              <SelectContent>
-                {campaigns.length === 0 ? (
-                  <SelectItem value="" disabled>
-                    Sin campañas disponibles
-                  </SelectItem>
-                ) : (
-                  campaigns.map((campaign) => (
-                    <SelectItem key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-zinc-400">
-              Las reglas de campaña se aplicarán a los clips generados.
-            </p>
-          </div>
-
-          {/* Reframe Mode Selector */}
-          <div className="space-y-2.5">
-            <Label
-              htmlFor="reframe-mode-select"
-              className="text-[13px] font-medium text-zinc-200"
-            >
-              Modo reframe
-            </Label>
-            <Select
-              value={reframeMode}
-              onValueChange={(v) => setReframeMode(v as ReframeMode)}
-            >
-              <SelectTrigger className="bg-[#09090B] border-white/[0.08] text-zinc-100">
-                <SelectValue placeholder="Selecciona un modo" />
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </SelectTrigger>
-              <SelectContent>
-                {REFAME_MODE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <div className="flex flex-col">
-                      <span>{option.label}</span>
-                      <span className="text-[11px] text-zinc-400">
-                        {option.description}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </section>
-
-      {/* Preset Preview section */}
-      <section className="bg-[#111114] border border-white/[0.08] rounded-lg p-5 space-y-5">
-        <h2 className="text-[15px] font-semibold text-zinc-100">
-          3. Estilo de subtítulos
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Preset Selection */}
-          <div className="space-y-3">
-            <Label className="text-[13px] font-medium text-zinc-200">
-              Preset de subtítulos
-            </Label>
-            <div className="grid grid-cols-1 gap-2">
-              {(Object.keys(PRESET_STYLES) as CaptionPreset[]).map((preset) => (
-                <div
-                  key={preset}
-                  onClick={() => setSelectedPreset(preset)}
-                  className={`
-                    flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer
-                    ${selectedPreset === preset
-                      ? "border-amber-400 bg-amber-400/[0.05]"
-                      : "border-white/[0.08] hover:border-white/[0.15] bg-[#09090B]"}
-                  `}
-                >
-                  <div
-                    className="w-10 h-10 rounded-full"
-                    style={{ backgroundColor: PRESET_STYLES[preset].swatch }}
+              <TabsContent value="url" className="mt-0 space-y-2">
+                <Label htmlFor="source-url">Enlace del vídeo</Label>
+                <div className="relative">
+                  <Link2
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500"
+                    aria-hidden="true"
                   />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-zinc-100">
-                      {PRESET_STYLES[preset].name}
-                    </div>
-                    <div className="text-xs text-zinc-400">
-                      {PRESET_STYLES[preset].subtitle}
-                    </div>
-                  </div>
-                  {selectedPreset === preset && (
-                    <div className="w-2 h-2 rounded-full bg-amber-400" />
-                  )}
+                  <Input
+                    id="source-url"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    value={sourceUrl}
+                    onChange={(event) => {
+                      setSourceUrl(event.target.value);
+                      if (urlError) setUrlError(null);
+                    }}
+                    disabled={isPending}
+                    aria-invalid={Boolean(urlError)}
+                    className="pl-9"
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
+                {urlError ? (
+                  <p role="alert" className="text-xs text-rose-400">
+                    {urlError}
+                  </p>
+                ) : (
+                  <p className="text-xs text-zinc-500">
+                    Compatible con YouTube, X, TikTok y enlaces directos a MP4.
+                  </p>
+                )}
+              </TabsContent>
 
-          {/* Preview */}
-          <div>
-            <Label className="text-[13px] font-medium text-zinc-200 block mb-2">
-              Vista previa
-            </Label>
-            {presetData && (
-              <SubtitlePresetPreview
-                preset={selectedPreset}
-                presetData={presetData}
-                isPlaying={true}
-                className="aspect-video"
+              <TabsContent value="file" className="mt-0">
+                <FileDropzone
+                  file={file}
+                  onFileChange={setFile}
+                  onCancelUpload={handleCancelUpload}
+                  progress={uploadProgress}
+                  uploading={isPending && sourceType === "file"}
+                  disabled={isPending}
+                />
+              </TabsContent>
+            </Tabs>
+          </Section>
+
+          <Section title="Detalles" description="Opcional: ponle un nombre al proyecto.">
+            <Label htmlFor="project-title">Título</Label>
+            <Input
+              id="project-title"
+              placeholder="Se autogenera desde el vídeo"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              disabled={isPending}
+            />
+          </Section>
+
+          <Section
+            title="Cantidad de clips"
+            description="Cuántos shorts quieres extraer del vídeo."
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-2xl font-semibold tabular-nums text-zinc-100">
+                  {maxClips ? "Máx." : clipCount}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  {maxClips
+                    ? "Se generarán todos los clips válidos que encuentre el modelo."
+                    : `${clipCount} ${clipCount === 1 ? "clip" : "clips"} solicitados`}
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+                <Switch
+                  checked={maxClips}
+                  onCheckedChange={setMaxClips}
+                  disabled={isPending}
+                  aria-label="Máximo posible"
+                />
+                Máximo posible
+              </label>
+            </div>
+            <div className="mt-4 px-1">
+              <Slider
+                value={[clipCount]}
+                min={1}
+                max={20}
+                step={1}
+                disabled={maxClips || isPending}
+                onValueChange={(values) => setClipCount(values[0] ?? 1)}
+                aria-label="Cantidad de clips"
               />
-            )}
+              <div className="mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-zinc-600">
+                <span>1</span>
+                <span>20</span>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Estilo y encuadre">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Idioma</Label>
+                <Select
+                  value={language}
+                  onValueChange={(value) => setLanguage(value as Language)}
+                  disabled={isPending}
+                >
+                  <SelectTrigger aria-label="Idioma del contenido">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Detección automática</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
+                    <SelectItem value="en">Inglés</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Preset de subtítulos</Label>
+                <Select
+                  value={preset}
+                  onValueChange={setPreset}
+                  disabled={isPending}
+                >
+                  <SelectTrigger aria-label="Preset de subtítulos">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {presetOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="size-2.5 rounded-full"
+                            style={{ backgroundColor: option.swatch }}
+                            aria-hidden="true"
+                          />
+                          {option.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <Label>Encuadre vertical</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {REFRAME_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  const active = reframeMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setReframeMode(option.id)}
+                      aria-pressed={active}
+                      className={cn(
+                        "flex items-start gap-2.5 rounded-lg border p-2.5 text-left transition-colors",
+                        active
+                          ? "border-amber-500/50 bg-amber-500/5"
+                          : "border-white/10 bg-[#0d0d10] hover:border-white/20",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "mt-0.5 size-4 shrink-0",
+                          active ? "text-amber-400" : "text-zinc-500",
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span>
+                        <span className="block text-xs font-medium text-zinc-200">
+                          {option.label}
+                        </span>
+                        <span className="block text-[11px] text-zinc-500">
+                          {option.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="campaign">Campaña</Label>
+              <Select value="none" disabled>
+                <SelectTrigger id="campaign" aria-label="Campaña (próximamente)">
+                  <SelectValue placeholder="Sin campaña" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin campaña</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <Users className="size-3.5" aria-hidden="true" />
+                Las reglas de campaña llegan en un change posterior.
+              </p>
+            </div>
+          </Section>
+
+          <div className="flex flex-col-reverse items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+            <Button asChild type="button" variant="ghost" disabled={isPending}>
+              <Link href="/projects">Cancelar</Link>
+            </Button>
+            <Button type="submit" size="lg" disabled={!canSubmit || isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                  {sourceType === "file" && uploadProgress > 0
+                    ? `Subiendo ${uploadProgress}%…`
+                    : "Creando proyecto…"}
+                </>
+              ) : (
+                <>
+                  <Sparkles aria-hidden="true" />
+                  Generar clips
+                  <ArrowRight aria-hidden="true" />
+                </>
+              )}
+            </Button>
           </div>
         </div>
-      </section>
 
-      {/* Actions */}
-      <div className="flex gap-3">
-        <Link href="/projects">
-          <Button variant="outline" className="border-white/[0.08] text-zinc-200">
-           Cancelar
-          </Button>
-        </Link>
-        <Button
-          onClick={activeTab === "url" ? handleUrlSubmit : () => file && handleFileUpload(file)}
-          disabled={!isFormValid || createProject.isPending}
-          className="bg-amber-500 hover:bg-amber-600 text-zinc-950"
-        >
-          {createProject.isPending ? "Creando proyecto..." : "Crear proyecto"}
-        </Button>
+        <aside className="lg:sticky lg:top-6">
+          <div className="space-y-3 rounded-xl border border-white/10 bg-[#111114] p-4">
+            <p className="text-center text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Previsualización 9:16
+            </p>
+            <SubtitlePresetPreview
+              preset={preset}
+              presetData={selectedPreset?.data ?? null}
+              reframeMode={reframeMode}
+            />
+            <p className="mx-auto max-w-[286px] text-center text-[11px] leading-relaxed text-zinc-600">
+              Así se verán los subtítulos y el encuadre en el clip final. Puedes
+              cambiarlo después en el editor de cada clip.
+            </p>
+          </div>
+        </aside>
       </div>
-    </div>
+    </form>
   );
 }

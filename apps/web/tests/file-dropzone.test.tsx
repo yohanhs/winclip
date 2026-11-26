@@ -1,86 +1,85 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+
 import { FileDropzone } from "@/components/projects/file-dropzone";
 
-// Mock lucide-react
-vi.mock("lucide-react", () => ({
-  FileVideo: () => <svg data-testid="file-video" />,
-  Upload: () => <svg data-testid="upload" />,
-  X: () => <svg data-testid="x-icon" />,
-  AlertCircle: () => <svg data-testid="alert-circle" />,
-}));
+function makeVideoFile(name = "clip.mp4", size = 2 * 1024 * 1024): File {
+  return new File([new Uint8Array(size)], name, { type: "video/mp4" });
+}
 
 describe("FileDropzone", () => {
-  const mockOnFileSelected = vi.fn();
-  const mockOnUploadComplete = vi.fn();
-  const mockOnUploadError = vi.fn();
+  const onFileChange = vi.fn();
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    onFileChange.mockReset();
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-    vi.useRealTimers();
+  it("muestra la zona de arrastre y el límite de tamaño", () => {
+    render(<FileDropzone file={null} onFileChange={onFileChange} />);
+    expect(
+      screen.getByText(
+        /Arrastra un archivo de video aquí o haz clic para seleccionar/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/hasta 4000 MB/i)).toBeInTheDocument();
   });
 
-  describe("Initial rendering", () => {
-    it("shows the drop zone with placeholder text", () => {
-      render(<FileDropzone />);
-
-      expect(
-        screen.getByText(
-          /Arrastra un archivo de video aquí o haz clic para seleccionar/i
-        )
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/Formatos admitidos: MP4, MOV, MKV, AVI/i)
-      ).toBeInTheDocument();
-    });
-
-    it("shows supported formats info", () => {
-      render(<FileDropzone />);
-
-      expect(
-        screen.getByText(/Tamaño máximo: 4000MB/i)
-      ).toBeInTheDocument();
-    });
-
-    it("shows upload icon", () => {
-      render(<FileDropzone />);
-
-      expect(screen.getByTestId("upload")).toBeInTheDocument();
-    });
+  it("acepta un vídeo válido mediante el input", () => {
+    render(<FileDropzone file={null} onFileChange={onFileChange} />);
+    const input = screen.getByLabelText("Seleccionar archivo de vídeo");
+    const file = makeVideoFile();
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(onFileChange).toHaveBeenCalledWith(file);
   });
 
-  describe("Upload callback", () => {
-    it("handles upload complete callback", async () => {
-      render(
-        <FileDropzone
-          onFileSelected={mockOnFileSelected}
-          onUploadComplete={mockOnUploadComplete}
-        />
-      );
-
-      // Check dropzone is rendered
-      expect(screen.getByTestId("upload")).toBeInTheDocument();
-    });
+  it("rechaza archivos que no son vídeo", () => {
+    render(<FileDropzone file={null} onFileChange={onFileChange} />);
+    const input = screen.getByLabelText("Seleccionar archivo de vídeo");
+    const file = new File(["texto"], "notas.txt", { type: "text/plain" });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(onFileChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/El archivo debe ser un vídeo/i),
+    ).toBeInTheDocument();
   });
 
-  describe("Disabled state", () => {
-    it("renders with disabled prop", () => {
-      render(<FileDropzone disabled />);
+  it("muestra el archivo seleccionado y permite quitarlo", () => {
+    const file = makeVideoFile("entrevista.mp4");
+    render(<FileDropzone file={file} onFileChange={onFileChange} />);
+    expect(screen.getByText("entrevista.mp4")).toBeInTheDocument();
+    expect(screen.getByText(/2.0 MB/)).toBeInTheDocument();
 
-      // Check drop zone exists
-      expect(screen.getByText(/Arrastra un archivo de video/i)).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByLabelText("Quitar archivo"));
+    expect(onFileChange).toHaveBeenCalledWith(null);
   });
 
-  describe("Placeholder customization", () => {
-    it("shows custom placeholder text when provided", () => {
-      render(<FileDropzone placeholder="Custom drop zone text" />);
+  it("muestra el progreso real de subida y permite cancelar", () => {
+    const onCancelUpload = vi.fn();
+    render(
+      <FileDropzone
+        file={makeVideoFile()}
+        onFileChange={onFileChange}
+        onCancelUpload={onCancelUpload}
+        uploading
+        progress={42}
+      />,
+    );
+    expect(screen.getByText("42%")).toBeInTheDocument();
+    expect(screen.getByText("Subiendo archivo")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Cancelar subida/i }));
+    expect(onCancelUpload).toHaveBeenCalledTimes(1);
+  });
 
-      expect(screen.getByText("Custom drop zone text")).toBeInTheDocument();
-    });
+  it("rechaza archivos que superan el límite de tamaño", () => {
+    render(
+      <FileDropzone file={null} onFileChange={onFileChange} maxSizeMB={1} />,
+    );
+    const input = screen.getByLabelText("Seleccionar archivo de vídeo");
+    const bigFile = makeVideoFile("enorme.mp4", 2 * 1024 * 1024);
+    fireEvent.change(input, { target: { files: [bigFile] } });
+    expect(onFileChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/El archivo supera el límite de 1 MB/i),
+    ).toBeInTheDocument();
   });
 });

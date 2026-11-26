@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
   CircleCheck,
@@ -11,153 +10,162 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { API_URL, fetchHealth, type CheckStatus } from "@/lib/api";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useHealth } from "@/hooks/use-api-client";
+import { API_URL, errorMessage, type HealthCheck } from "@/lib/api";
 
-const STATUS_META: Record<CheckStatus, { label: string; className: string; Icon: LucideIcon }> = {
+const STATUS_META: Record<
+  HealthCheck["status"],
+  { label: string; className: string; Icon: LucideIcon }
+> = {
   ok: {
     label: "ok",
-    className: "border-success/30 bg-success/10 text-success",
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
     Icon: CircleCheck,
   },
   warn: {
     label: "aviso",
-    className: "border-warning/40 bg-warning/10 text-warning",
+    className: "border-amber-500/40 bg-amber-500/10 text-amber-400",
     Icon: TriangleAlert,
   },
   error: {
     label: "error",
-    className: "border-destructive/40 bg-destructive/10 text-destructive",
+    className: "border-rose-500/40 bg-rose-500/10 text-rose-400",
     Icon: AlertCircle,
   },
 };
 
-function ApiUnavailable({ onRetry }: { onRetry: () => void }) {
-  return (
-    <Card className="border-destructive/40">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-destructive">
-          <AlertCircle className="size-4" aria-hidden />
-          API no disponible
-        </CardTitle>
-        <CardDescription>
-          No se pudo consultar <code>{API_URL}/api/health</code>. Arranca la API desde la raíz del
-          repo:
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-sm">
-        <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
-          <code>pnpm dev</code>
-        </pre>
-        <p className="text-muted-foreground">o solo la API:</p>
-        <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
-          <code>uv run --project apps/api uvicorn winclip.main:app --reload --port 8000</code>
-        </pre>
-        <div>
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            <RefreshCw className="size-3.5" aria-hidden />
-            Reintentar
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function StatusClient() {
-  const { data, isPending, isError, refetch, isFetching } = useQuery({
-    queryKey: ["health"],
-    queryFn: fetchHealth,
-    refetchInterval: 30_000,
-  });
-
-  const counts = data
-    ? {
-        ok: data.checks.filter((check) => check.status === "ok").length,
-        warn: data.checks.filter((check) => check.status === "warn").length,
-        error: data.checks.filter((check) => check.status === "error").length,
-      }
-    : null;
+  const health = useHealth();
+  const checks = health.data?.checks ?? [];
+  const counts = checks.reduce(
+    (acc, check) => {
+      acc[check.status] += 1;
+      return acc;
+    },
+    { ok: 0, warn: 0, error: 0 },
+  );
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Estado del sistema</h1>
-          <p className="text-sm text-muted-foreground">
-            Diagnóstico de las dependencias locales. La API se consulta en{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">{API_URL}</code>.
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+            Estado del sistema
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Comprobaciones reales de <code className="text-zinc-400">GET /api/health</code>{" "}
+            sobre binarios, modelos y almacenamiento local.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={isFetching ? "size-3.5 animate-spin" : "size-3.5"} aria-hidden />
-          Actualizar
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void health.refetch()}
+          disabled={health.isFetching}
+        >
+          <RefreshCw
+            className={health.isFetching ? "animate-spin" : undefined}
+            aria-hidden="true"
+          />
+          Volver a comprobar
         </Button>
       </header>
 
-      {isPending ? <p className="text-sm text-muted-foreground">Consultando la API…</p> : null}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-[#111114] px-4 py-3">
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">OK</p>
+          <p className="font-mono text-2xl font-semibold tabular-nums text-emerald-400">
+            {counts.ok}
+          </p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-[#111114] px-4 py-3">
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">
+            Avisos
+          </p>
+          <p className="font-mono text-2xl font-semibold tabular-nums text-amber-400">
+            {counts.warn}
+          </p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-[#111114] px-4 py-3">
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">
+            Errores
+          </p>
+          <p className="font-mono text-2xl font-semibold tabular-nums text-rose-400">
+            {counts.error}
+          </p>
+        </div>
+      </div>
 
-      {isError ? <ApiUnavailable onRetry={() => refetch()} /> : null}
-
-      {data ? (
-        <>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="font-medium">
-              {data.app} {data.version}
-            </span>
-            <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
-              {counts?.ok} ok
-            </Badge>
-            <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
-              {counts?.warn} aviso(s)
-            </Badge>
-            <Badge
-              variant="outline"
-              className="border-destructive/40 bg-destructive/10 text-destructive"
-            >
-              {counts?.error} error(es)
-            </Badge>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Comprobaciones</CardTitle>
-              <CardDescription>
-                Un aviso no impide usar WinClip; un error sí debe corregirse antes del pipeline.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col divide-y">
-              {data.checks.map((check) => {
-                const meta = STATUS_META[check.status];
-                const Icon = meta.Icon;
-                return (
-                  <div
-                    key={check.name}
-                    className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-4"
-                  >
-                    <div className="flex min-w-44 items-center gap-2">
-                      <Icon className="size-4" aria-hidden />
-                      <span className="font-medium">{check.name}</span>
-                    </div>
-                    <div className="flex flex-1 flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={meta.className}>
-                          {meta.label}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">{check.detail}</span>
-                      </div>
-                      {check.hint ? (
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium">Sugerencia:</span> {check.hint}
-                        </p>
-                      ) : null}
-                    </div>
+      {health.isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-20 rounded-xl" />
+          ))}
+        </div>
+      ) : health.isError ? (
+        <Card className="border-rose-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-rose-400">
+              <AlertCircle className="size-4" aria-hidden="true" />
+              La API no responde
+            </CardTitle>
+            <CardDescription>
+              {errorMessage(health.error)}. Arranca el backend con{" "}
+              <code>pnpm dev</code> y vuelve a comprobar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-xs text-zinc-500">
+            URL configurada:{" "}
+            <span className="font-mono text-zinc-400">{API_URL}</span>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {checks.map((check) => {
+            const meta = STATUS_META[check.status];
+            const Icon = meta.Icon;
+            return (
+              <div
+                key={check.name}
+                className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#111114] px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <Icon
+                    className="mt-0.5 size-4 shrink-0 text-zinc-400"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium capitalize text-zinc-100">
+                      {check.name}
+                    </p>
+                    <p className="text-xs text-zinc-400">{check.detail}</p>
+                    {check.hint ? (
+                      <p className="mt-0.5 text-xs text-zinc-500">{check.hint}</p>
+                    ) : null}
                   </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </>
+                </div>
+                <Badge variant="outline" className={meta.className}>
+                  {meta.label}
+                </Badge>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {health.data ? (
+        <p className="text-center text-[11px] text-zinc-600">
+          {health.data.app} v{health.data.version} · {API_URL}
+        </p>
       ) : null}
     </div>
   );

@@ -1,7 +1,14 @@
 /**
- * Helper para subida de archivos con progreso real usando XMLHttpRequest
- * Permite reportar progreso 0-100 en subidas multipart grandes
+ * Subida de archivos con progreso real.
+ *
+ * `fetch` no expone eventos de progreso de subida en los navegadores, así que
+ * los archivos grandes (varios GB) se envían con `XMLHttpRequest` tipado.
  */
+
+import { ApiError } from "./errors";
+import type { components } from "./schema";
+
+export type CreateProjectResponse = components["schemas"]["ProjectCreated"];
 
 export interface UploadProgress {
   loaded: number;
@@ -9,163 +16,115 @@ export interface UploadProgress {
   percentage: number;
 }
 
-export interface UploadOptions {
-  baseUrl: string;
-  formData: FormData;
-  onProgress?: (progress: UploadProgress) => void;
-  signal?: AbortSignal;
+export type RequestedClips = number | "max";
+export type ProjectLanguage = "auto" | "es" | "en";
+export type ReframeMode = "face" | "center" | "blur" | "passthrough";
+
+export interface ProjectFormDataInput {
+  source_url?: string;
+  file?: File;
+  requested_clips: RequestedClips;
+  language: ProjectLanguage;
+  subtitle_preset: string;
+  reframe_mode: ReframeMode;
+  campaign_id?: string;
+  title?: string;
+}
+
+function isProjectCreated(value: unknown): value is CreateProjectResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { project?: unknown; job?: unknown };
+  return (
+    typeof candidate.project === "object" &&
+    candidate.project !== null &&
+    typeof candidate.job === "object" &&
+    candidate.job !== null
+  );
 }
 
 /**
- * Respuesta del endpoint createProject
+ * Sube un proyecto multipart con progreso 0..100 y soporte de `AbortSignal`.
  */
-export interface CreateProjectResponse {
-  project: {
-    id: string;
-    workspace_id: string;
-    campaign_id: string | null;
-    source_type: "url" | "file";
-    source_url: string | null;
-    title: string;
-    status: string;
-    requested_clips: number | null;
-    language: string;
-    duration: number | null;
-    created_at: string;
-  };
-  job: {
-    id: string;
-    project_id: string;
-    type: string;
-    payload: Record<string, unknown>;
-    status: string;
-    progress: number;
-    stage: string | null;
-    error: string | null;
-    attempts: number;
-    created_at: string;
-    updated_at: string;
-    started_at: string | null;
-    completed_at: string | null;
-  };
-}
-
-/**
- * Sube un proyecto con progreso real usando XMLHttpRequest
- * Necesario porque fetch no expone eventos de progreso de subida en navegadores
- *
- * @param options Opciones de subida
- * @returns Respuesta tipada del endpoint createProject
- */
-export async function uploadProjectWithProgress(
-  options: UploadOptions
+export function uploadProjectWithProgress(
+  baseUrl: string,
+  formData: FormData,
+  onProgress?: (progress: UploadProgress) => void,
+  signal?: AbortSignal
 ): Promise<CreateProjectResponse> {
-  const { baseUrl, formData, onProgress, signal } = options;
-
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    // Configurar progreso de subida
     xhr.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable && onProgress) {
-        onProgress({
-          loaded: event.loaded,
-          total: event.total,
-          percentage: Math.round((event.loaded / event.total) * 100),
-        });
-      }
+      if (!event.lengthComputable) return;
+      onProgress?.({
+        loaded: event.loaded,
+        total: event.total,
+        percentage: Math.round((event.loaded / event.total) * 100),
+      });
     });
 
-    // Manejar respuesta
     xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response);
-        } catch (e) {
-          reject(new Error("Respuesta inválida del servidor"));
-        }
-      } else {
-        try {
-          const errorData = JSON.parse(xhr.responseText);
-          reject(new ApiError(xhr.status, errorData));
-        } catch {
-          reject(new ApiError(xhr.status, { message: xhr.statusText }));
-        }
+      let payload: unknown = null;
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        payload = null;
       }
+      if (xhr.status >= 200 && xhr.status < 300 && isProjectCreated(payload)) {
+        resolve(payload);
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        reject(new Error("Respuesta inválida del servidor"));
+        return;
+      }
+      reject(new ApiError(xhr.status, payload));
     });
 
-    // Manejar errores de red
     xhr.addEventListener("error", () => {
       reject(new Error("Error de red durante la subida"));
     });
 
-    // Manejar abort
     xhr.addEventListener("abort", () => {
-      reject(new Error("Subida cancelada"));
+      reject(new DOMException("Subida cancelada", "AbortError"));
     });
 
-    // Manejar timeout
     xhr.addEventListener("timeout", () => {
       reject(new Error("Tiempo de espera agotado"));
     });
 
-    // Soporte para AbortSignal
     if (signal) {
       if (signal.aborted) {
-        xhr.abort();
+        reject(new DOMException("Subida cancelada", "AbortError"));
         return;
       }
-      signal.addEventListener("abort", () => xhr.abort());
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
     }
 
-    // Abrir conexión y enviar
     xhr.open("POST", `${baseUrl}/api/projects`);
-    xhr.timeout = 0; // Sin timeout para archivos grandes
+    xhr.timeout = 0;
     xhr.send(formData);
   });
 }
 
-/**
- * Error tipado de la API para uploads
- */
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly data: unknown
-  ) {
-    super(`API Error ${status}: ${JSON.stringify(data)}`);
-    this.name = "ApiError";
-  }
-}
-
-/**
- * Crea el FormData para crear un proyecto
- */
-export function createProjectFormData(data: {
-  source_url?: string;
-  file?: File;
-  requested_clips: number | "max";
-  language: "auto" | "es" | "en";
-  subtitle_preset: string;
-  reframe_mode: "face" | "center" | "blur" | "passthrough";
-  campaign_id?: string;
-}): FormData {
+/** Construye el `FormData` que espera `POST /api/projects`. */
+export function createProjectFormData(data: ProjectFormDataInput): FormData {
   const formData = new FormData();
 
-  if (data.source_url) {
-    formData.append("source_url", data.source_url);
-  }
   if (data.file) {
     formData.append("file", data.file);
+    formData.append("source_type", "file");
   }
-  formData.append("requested_clips", data.requested_clips.toString());
+  if (data.source_url) {
+    formData.append("source_url", data.source_url);
+    formData.append("source_type", "url");
+  }
+  if (data.title) formData.append("title", data.title);
+  formData.append("requested_clips", String(data.requested_clips));
   formData.append("language", data.language);
   formData.append("subtitle_preset", data.subtitle_preset);
   formData.append("reframe_mode", data.reframe_mode);
-  if (data.campaign_id) {
-    formData.append("campaign_id", data.campaign_id);
-  }
+  if (data.campaign_id) formData.append("campaign_id", data.campaign_id);
 
   return formData;
 }

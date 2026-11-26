@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, Settings } from "lucide-react";
+import { Activity, ArrowRight, Database, FolderCog, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -6,47 +6,97 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export const metadata: Metadata = { title: "Ajustes" };
 
+const ITEMS = [
+  {
+    href: "/settings/status",
+    title: "Estado del sistema",
+    description:
+      "Comprueba ffmpeg, whisper, ollama, claves de LLM, almacenamiento y volumen externo.",
+    icon: Activity,
+    cta: "Ver comprobaciones",
+  },
+  {
+    href: "/settings/status",
+    title: "Almacenamiento",
+    description:
+      "Los proyectos y clips se guardan en STORAGE_DIR. La ruta y el espacio libre se validan en el health check.",
+    icon: Database,
+    cta: "Revisar almacenamiento",
+  },
+];
+
 export default function SettingsPage() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Ajustes</h1>
-        <p className="text-sm text-muted-foreground">
-          Configuración local de WinClip. Los secretos viven en el <code>.env</code> de la raíz y
-          nunca se muestran en la interfaz.
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+          Ajustes
+        </h1>
+        <p className="text-sm text-zinc-500">
+          Configuración local de WinClip. Los secretos viven en el{" "}
+          <code className="text-zinc-400">.env</code> de la raíz y nunca se
+          muestran en la interfaz.
         </p>
       </header>
 
-      <Link href="/settings/status" className="group">
-        <Card className="transition-colors group-hover:border-foreground/20">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Activity className="size-4" aria-hidden />
-                Estado del sistema
-              </span>
-              <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
-            </CardTitle>
-            <CardDescription>
-              Resultado del doctor: ffmpeg-full con libass, ffprobe, yt-dlp, whisper, Ollama,
-              Playwright, volumen externo, almacenamiento y claves.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </Link>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {ITEMS.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.title} href={item.href} className="group">
+              <Card className="h-full transition-colors group-hover:border-white/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-base">
+                    <span className="flex items-center gap-2">
+                      <Icon className="size-4 text-amber-400" aria-hidden="true" />
+                      {item.title}
+                    </span>
+                    <ArrowRight
+                      className="size-4 text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-400"
+                      aria-hidden="true"
+                    />
+                  </CardTitle>
+                  <CardDescription>{item.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="text-xs font-medium text-amber-400/90">
+                  {item.cta}
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="size-4" aria-hidden />
-            Preferencias
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FolderCog className="size-4 text-zinc-400" aria-hidden="true" />
+            Variables de entorno
           </CardTitle>
           <CardDescription>
-            Marca, presets de subtítulos y cuentas se configurarán en changes posteriores.
+            Cambia los valores en el <code>.env</code> local y reinicia{" "}
+            <code>pnpm dev</code>. La interfaz solo lee la configuración pública.
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Por ahora todo se ajusta con variables de entorno (ver <code>.env.example</code>).
+        <CardContent>
+          <ul className="grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
+            <li className="flex items-center gap-2">
+              <ShieldCheck className="size-3.5 text-emerald-400" aria-hidden="true" />
+              <code>STORAGE_DIR</code> · carpeta de proyectos y clips
+            </li>
+            <li className="flex items-center gap-2">
+              <ShieldCheck className="size-3.5 text-emerald-400" aria-hidden="true" />
+              <code>NEXT_PUBLIC_API_URL</code> · URL de la API para la web
+            </li>
+            <li className="flex items-center gap-2">
+              <ShieldCheck className="size-3.5 text-emerald-400" aria-hidden="true" />
+              <code>WHISPER_MODEL</code> · modelo de transcripción
+            </li>
+            <li className="flex items-center gap-2">
+              <ShieldCheck className="size-3.5 text-emerald-400" aria-hidden="true" />
+              <code>OLLAMA_HOST</code> · LLM local de respaldo
+            </li>
+          </ul>
         </CardContent>
       </Card>
     </div>
