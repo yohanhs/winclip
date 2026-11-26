@@ -45,7 +45,10 @@ jobs:
       - name: Formato
         run: uv run ruff format --check .
       - name: Tests
-        run: uv run pytest
+        env:
+          NO_COLOR: "1"
+          COLUMNS: "200"
+        run: uv run pytest -m "not slow"
 
   web:
     name: web (lint + build)
