@@ -292,14 +292,40 @@ def _render_options(
     project: Project,
     *,
     force: bool,
+    clip: Clip | None = None,
     campaign_rules: CampaignRules | None = None,
     storage: LocalStorage | None = None,
 ) -> RenderOptions:
-    mode = project.reframe_mode if project.reframe_mode != "passthrough" else "center"
+    """Resuelve opciones en cascada: clip.render_overrides > campaign.rules > project > defaults."""
+    overrides = dict((clip.render_overrides if clip is not None else None) or {})
+    word_overrides = dict((clip.subtitle_overrides if clip is not None else None) or {})
+
+    clip_preset = overrides.get("subtitle_preset")
+    preset = (
+        str(clip_preset)
+        if clip_preset
+        else (
+            campaign_rules.subtitle_preset
+            if campaign_rules is not None and campaign_rules.subtitle_preset
+            else (project.subtitle_preset or "bold-yellow")
+        )
+    )
+
+    raw_mode = overrides.get("reframe_mode") or project.reframe_mode or "face"
+    mode = raw_mode if raw_mode != "passthrough" else "center"
+
+    crop_x_pct = float(overrides["crop_x_pct"]) if overrides.get("crop_x_pct") is not None else 50.0
+    crop_y_pct = float(overrides["crop_y_pct"]) if overrides.get("crop_y_pct") is not None else 50.0
+    zoom_pct = float(overrides["zoom_pct"]) if overrides.get("zoom_pct") is not None else 100.0
+
     base = RenderOptions(
-        preset=project.subtitle_preset,
+        preset=preset,
         reframe=mode,  # type: ignore[arg-type]
         engine="ass",
+        crop_x_pct=crop_x_pct,
+        crop_y_pct=crop_y_pct,
+        zoom_pct=zoom_pct,
+        word_overrides=word_overrides,
         hook_overlay=True,
         force=force,
     )
@@ -404,12 +430,6 @@ def _run_render_stage(
         raise HandlerError("el proyecto no tiene clips que renderizar")
 
     _, campaign_rules = _project_campaign(ctx.engine, project)
-    options = _render_options(
-        project,
-        force=True,
-        campaign_rules=campaign_rules,
-        storage=ctx.storage,
-    )
     start_progress = SELECT_PROGRESS_END if clip is None else 0.0
     span = 100.0 - start_progress
     rendered: list[Clip] = []
@@ -424,6 +444,14 @@ def _run_render_stage(
             if clip is not None:
                 _sync_candidate_times(ctx, project.id, target)
 
+            target_options = _render_options(
+                project,
+                force=True,
+                clip=target,
+                campaign_rules=campaign_rules,
+                storage=ctx.storage,
+            )
+
             base = start_progress + span * index / len(targets)
             share = span / len(targets)
 
@@ -433,7 +461,7 @@ def _run_render_stage(
             manifest = backends.render(
                 project.id,
                 candidate_id,
-                options,
+                target_options,
                 settings=ctx.settings,
                 on_progress=on_progress,
                 clip_id=target.id,

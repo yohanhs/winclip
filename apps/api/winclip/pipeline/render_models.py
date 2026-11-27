@@ -109,7 +109,8 @@ class RenderOptions(BaseModel):
     font: str | None = None
     crop_x_pct: float = Field(default=50.0, ge=0.0, le=100.0)
     crop_y_pct: float = Field(default=50.0, ge=0.0, le=100.0)
-    zoom_pct: float = Field(default=100.0, ge=100.0, le=300.0)
+    zoom_pct: float = Field(default=100.0, ge=50.0, le=300.0)
+    word_overrides: dict[str, str] = Field(default_factory=dict)
     hook_overlay: bool = True
     hook_seconds: float = Field(default=3.0, ge=0.5, le=15.0)
     watermark_path: Path | None = None

@@ -71,23 +71,34 @@ def _ends_soft(text: str) -> bool:
     return text.rstrip(_TRAILING).endswith(SOFT_BREAKS)
 
 
+def word_override_key(start: float, end: float) -> str:
+    """Clave estable por timestamp absoluto en milisegundos (`start_ms:end_ms`)."""
+    return f"{round(start * 1000)}:{round(end * 1000)}"
+
+
 def retime_words(
     transcript: Transcript,
     start: float,
     end: float,
     *,
     uppercase: bool = False,
+    word_overrides: dict[str, str] | None = None,
 ) -> list[TimedWord]:
     """Filtra y re-temporiza las palabras que caen dentro de `[start, end]`."""
     words: list[TimedWord] = []
     previous_end = 0.0
     for segment in transcript.segments:
         for word in segment.words:
-            text = word.w.strip()
-            if not text:
+            original = word.w.strip()
+            if not original:
                 continue
             if word.e <= start or word.s >= end:
                 continue
+            text = original
+            if word_overrides:
+                override = word_overrides.get(word_override_key(word.s, word.e))
+                if override is not None and override.strip():
+                    text = override.strip()
             clipped_start = max(0.0, word.s - start)
             clipped_end = min(end, word.e) - start
             clipped_start = max(clipped_start, previous_end)

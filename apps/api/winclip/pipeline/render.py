@@ -603,6 +603,7 @@ def compute_fingerprint(
             "crop_x_pct": options.crop_x_pct,
             "crop_y_pct": options.crop_y_pct,
             "zoom_pct": options.zoom_pct,
+            "word_overrides": dict(sorted(options.word_overrides.items())),
             "hook_overlay": options.hook_overlay,
             "hook_seconds": options.hook_seconds,
             "sample_fps": options.sample_fps,
@@ -923,6 +924,7 @@ def render_clip(
             candidate.start,
             candidate.end,
             uppercase=preset.uppercase,
+            word_overrides=options.word_overrides or None,
         )
         measure = measure_font(font.font.path, preset.font_size)
         cues = build_cues(words, preset, measure=measure)

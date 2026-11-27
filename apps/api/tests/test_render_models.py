@@ -112,7 +112,7 @@ def test_render_options_defaults() -> None:
         ("crop_x_pct", 120.0),
         ("crop_x_pct", -1.0),
         ("crop_y_pct", 101.0),
-        ("zoom_pct", 90.0),
+        ("zoom_pct", 40.0),
         ("zoom_pct", 320.0),
         ("hook_seconds", 0.1),
         ("sample_fps", 8.0),
