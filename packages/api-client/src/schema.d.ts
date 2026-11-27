@@ -589,6 +589,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publications Quota
+         * @description Resumen de consumo diario de cuota YouTube y límites por cuenta.
+         */
+        get: operations["getPublicationsQuota"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/preview-meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Publication Meta
+         * @description Precalcula metadatos propuestos por `(clip, cuenta)` junto con avisos y cuotas.
+         */
+        post: operations["previewPublicationMeta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Publications
+         * @description Lista publicaciones filtrables ordenadas de más reciente a más antigua.
+         */
+        get: operations["listPublications"];
+        put?: never;
+        /**
+         * Create Publications
+         * @description Crea publicaciones y encola un job `publish` independiente por cada `(clip, cuenta)`.
+         */
+        post: operations["createPublications"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publication
+         * @description Devuelve el detalle completo de una publicación (incluyendo capturas por paso).
+         */
+        get: operations["getPublication"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}/screenshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publication Screenshot
+         * @description Sirve la captura PNG diagnóstica validando ruta dentro de `STORAGE_DIR`.
+         */
+        get: operations["getPublicationScreenshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Publication
+         * @description Reencola una publicación `failed` respetando idempotencia por `external_id`.
+         */
+        post: operations["retryPublication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Publication
+         * @description Cancela una publicación `scheduled` y su job diferido pendiente.
+         */
+        post: operations["cancelPublication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -673,6 +817,36 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccountQuotaOut
+         * @description Resumen de uso diario y límite por cuenta.
+         */
+        AccountQuotaOut: {
+            /** Account Id */
+            account_id: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "youtube" | "tiktok" | "instagram";
+            /**
+             * Auth Method
+             * @enum {string}
+             */
+            auth_method: "api" | "playwright";
+            /** Display Name */
+            display_name: string;
+            /** Handle */
+            handle: string;
+            /** Alias */
+            alias?: string | null;
+            /** Used Today */
+            used_today: number;
+            /** Daily Limit */
+            daily_limit: number;
+            /** Remaining Today */
+            remaining_today: number;
+        };
         /**
          * AccountsOAuthConfigOut
          * @description Estado de configuración OAuth para todas las plataformas.
@@ -1108,6 +1282,55 @@ export interface components {
             missing?: string[];
         };
         /**
+         * PreviewMetaItemOut
+         * @description Metadatos propuestos para un par `(clip_id, account_id)`.
+         */
+        PreviewMetaItemOut: {
+            /** Clip Id */
+            clip_id: string;
+            /** Account Id */
+            account_id: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "youtube" | "tiktok" | "instagram";
+            /**
+             * Auth Method
+             * @enum {string}
+             */
+            auth_method: "api" | "playwright";
+            /**
+             * Delivery Mode
+             * @enum {string}
+             */
+            delivery_mode: "direct" | "inbox";
+            meta: components["schemas"]["PublishMeta"];
+            /** Warnings */
+            warnings?: string[];
+        };
+        /**
+         * PreviewMetaOut
+         * @description Respuesta de `POST /api/publications/preview-meta`.
+         */
+        PreviewMetaOut: {
+            /** Items */
+            items: components["schemas"]["PreviewMetaItemOut"][];
+            /** Warnings */
+            warnings?: string[];
+            quota: components["schemas"]["QuotaSummaryOut"];
+        };
+        /**
+         * PreviewMetaRequest
+         * @description Cuerpo de `POST /api/publications/preview-meta`.
+         */
+        PreviewMetaRequest: {
+            /** Clip Ids */
+            clip_ids: string[];
+            /** Account Ids */
+            account_ids: string[];
+        };
+        /**
          * ProjectCreated
          * @description Respuesta `201` de `POST /api/projects`.
          */
@@ -1167,6 +1390,356 @@ export interface components {
             updated_at: string;
             /** Jobs */
             jobs?: components["schemas"]["JobOut"][];
+        };
+        /**
+         * PublicationCancelRequest
+         * @description Cuerpo opcional de `POST /api/publications/{id}/cancel`.
+         */
+        PublicationCancelRequest: {
+            /**
+             * Delete Remote
+             * @default false
+             */
+            delete_remote: boolean;
+        };
+        /**
+         * PublicationCreateItem
+         * @description Un par `(clip, cuenta)` a encolar para publicación o programación.
+         */
+        PublicationCreateItem: {
+            /** Clip Id */
+            clip_id: string;
+            /** Account Id */
+            account_id: string;
+            meta: components["schemas"]["PublishMeta"];
+            /** Scheduled At */
+            scheduled_at?: string | null;
+        };
+        /**
+         * PublicationDetailOut
+         * @description Detalle completo de publicación incluyendo capturas por paso.
+         */
+        PublicationDetailOut: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Clip Id */
+            clip_id: string;
+            /** Project Id */
+            project_id?: string | null;
+            /** Project Title */
+            project_title?: string | null;
+            /**
+             * Clip Title
+             * @default
+             */
+            clip_title: string;
+            /** Clip Thumb Url */
+            clip_thumb_url?: string | null;
+            /** Account Id */
+            account_id: string;
+            /**
+             * Account Platform
+             * @enum {string}
+             */
+            account_platform: "youtube" | "tiktok" | "instagram";
+            /**
+             * Account Auth Method
+             * @enum {string}
+             */
+            account_auth_method: "api" | "playwright";
+            /**
+             * Account Display Name
+             * @default
+             */
+            account_display_name: string;
+            /**
+             * Account Handle
+             * @default
+             */
+            account_handle: string;
+            /** Account Alias */
+            account_alias?: string | null;
+            /** Job Id */
+            job_id?: string | null;
+            /**
+             * Job Progress
+             * @default 0
+             */
+            job_progress: number;
+            /** Job Stage */
+            job_stage?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "publishing" | "published" | "failed" | "cancelled";
+            /**
+             * Delivery Mode
+             * @enum {string}
+             */
+            delivery_mode: "direct" | "inbox";
+            /** Scheduled At */
+            scheduled_at?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            meta: components["schemas"]["PublishMeta"];
+            /** External Id */
+            external_id?: string | null;
+            /** External Url */
+            external_url?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Warnings */
+            warnings?: string[];
+            /**
+             * Has Screenshot
+             * @default false
+             */
+            has_screenshot: boolean;
+            /** Screenshot Url */
+            screenshot_url?: string | null;
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Step Screenshots */
+            step_screenshots?: string[];
+        };
+        /**
+         * PublicationOut
+         * @description Registro de publicación enriquecido para el historial `/publications`.
+         */
+        PublicationOut: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Clip Id */
+            clip_id: string;
+            /** Project Id */
+            project_id?: string | null;
+            /** Project Title */
+            project_title?: string | null;
+            /**
+             * Clip Title
+             * @default
+             */
+            clip_title: string;
+            /** Clip Thumb Url */
+            clip_thumb_url?: string | null;
+            /** Account Id */
+            account_id: string;
+            /**
+             * Account Platform
+             * @enum {string}
+             */
+            account_platform: "youtube" | "tiktok" | "instagram";
+            /**
+             * Account Auth Method
+             * @enum {string}
+             */
+            account_auth_method: "api" | "playwright";
+            /**
+             * Account Display Name
+             * @default
+             */
+            account_display_name: string;
+            /**
+             * Account Handle
+             * @default
+             */
+            account_handle: string;
+            /** Account Alias */
+            account_alias?: string | null;
+            /** Job Id */
+            job_id?: string | null;
+            /**
+             * Job Progress
+             * @default 0
+             */
+            job_progress: number;
+            /** Job Stage */
+            job_stage?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "publishing" | "published" | "failed" | "cancelled";
+            /**
+             * Delivery Mode
+             * @enum {string}
+             */
+            delivery_mode: "direct" | "inbox";
+            /** Scheduled At */
+            scheduled_at?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            meta: components["schemas"]["PublishMeta"];
+            /** External Id */
+            external_id?: string | null;
+            /** External Url */
+            external_url?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Warnings */
+            warnings?: string[];
+            /**
+             * Has Screenshot
+             * @default false
+             */
+            has_screenshot: boolean;
+            /** Screenshot Url */
+            screenshot_url?: string | null;
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * PublicationsCreateRequest
+         * @description Cuerpo de `POST /api/publications`.
+         */
+        PublicationsCreateRequest: {
+            /** Items */
+            items: components["schemas"]["PublicationCreateItem"][];
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+        };
+        /**
+         * PublishMeta
+         * @description Metadatos de publicación unificados y editables por plataforma.
+         */
+        PublishMeta: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /** Hashtags */
+            hashtags?: string[];
+            /** Scheduled At */
+            scheduled_at?: string | null;
+            /**
+             * Delivery Mode
+             * @default direct
+             * @enum {string}
+             */
+            delivery_mode: "direct" | "inbox";
+            /**
+             * Language
+             * @default es
+             */
+            language: string;
+            /** Tags */
+            tags?: string[];
+            /**
+             * Category Id
+             * @default 22
+             */
+            category_id: string;
+            /**
+             * Privacy Status
+             * @default public
+             * @enum {string}
+             */
+            privacy_status: "public" | "unlisted" | "private";
+            /** Pinned Comment */
+            pinned_comment?: string | null;
+            /**
+             * Upload Thumbnail
+             * @default true
+             */
+            upload_thumbnail: boolean;
+            /**
+             * Privacy Level
+             * @default PUBLIC_TO_EVERYONE
+             */
+            privacy_level: string;
+            /**
+             * Disable Comment
+             * @default false
+             */
+            disable_comment: boolean;
+            /**
+             * Disable Duet
+             * @default false
+             */
+            disable_duet: boolean;
+            /**
+             * Disable Stitch
+             * @default false
+             */
+            disable_stitch: boolean;
+            /**
+             * Share To Feed
+             * @default true
+             */
+            share_to_feed: boolean;
+            /** Thumb Offset Ms */
+            thumb_offset_ms?: number | null;
+            /** Publication Id */
+            publication_id?: string | null;
+            /** Existing External Id */
+            existing_external_id?: string | null;
+            /** Existing External Url */
+            existing_external_url?: string | null;
+        };
+        /**
+         * QuotaSummaryOut
+         * @description Resumen global de cuota YouTube y límites diarios por cuenta.
+         */
+        QuotaSummaryOut: {
+            /** Youtube Units Used */
+            youtube_units_used: number;
+            /** Youtube Units Limit */
+            youtube_units_limit: number;
+            /** Youtube Upload Cost */
+            youtube_upload_cost: number;
+            /** Youtube Uploads Today */
+            youtube_uploads_today: number;
+            /** Accounts */
+            accounts?: components["schemas"]["AccountQuotaOut"][];
         };
         /**
          * RuleViolation
@@ -2420,6 +2993,255 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SocialAccountOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getPublicationsQuota: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaSummaryOut"];
+                };
+            };
+        };
+    };
+    previewPublicationMeta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewMetaRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewMetaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listPublications: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+                clip_id?: string | null;
+                account_id?: string | null;
+                platform?: string | null;
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    createPublications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationsCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getPublication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getPublicationScreenshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retryPublication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancelPublication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PublicationCancelRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationOut"];
                 };
             };
             /** @description Validation Error */

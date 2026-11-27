@@ -8,7 +8,7 @@ consultando si ya hay otro trabajo `running` con `heavy_active=1`.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Engine, func, or_, update
@@ -44,6 +44,12 @@ def _job_from_row(row: Any) -> Job:
     return Job(**dict(row._mapping))
 
 
+def _normalize_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value.astimezone(UTC) if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
 def enqueue(
     engine: Engine,
     *,
@@ -51,9 +57,11 @@ def enqueue(
     project_id: str | None = None,
     payload: dict[str, Any] | None = None,
     max_attempts: int | None = None,
+    run_at: datetime | None = None,
 ) -> Job:
     """Crea un trabajo en estado `queued` y lo devuelve."""
     now = utcnow()
+    normalized_run_at = _normalize_utc(run_at)
     job = Job(
         id=new_job_id(),
         project_id=project_id,
@@ -64,7 +72,8 @@ def enqueue(
         stage="queued",
         attempts=0,
         max_attempts=max_attempts if max_attempts is not None else 3,
-        next_run_at=now,
+        run_at=normalized_run_at,
+        next_run_at=normalized_run_at if normalized_run_at is not None else now,
         created_at=now,
         updated_at=now,
     )
@@ -95,6 +104,7 @@ def claim_next(
     )
     eligible = (
         (job.c.status == "queued")
+        & or_(job.c.run_at.is_(None), job.c.run_at <= now)
         & or_(job.c.next_run_at.is_(None), job.c.next_run_at <= now)
         & or_(
             (job.c.type.in_(HEAVY_JOB_TYPES)) & (~heavy_exists),
@@ -313,6 +323,7 @@ def fail_job(
     error: str,
     *,
     retryable: bool = True,
+    backoff_override_seconds: float | None = None,
 ) -> Job:
     """Reintenta con backoff o marca `failed` si se agotaron los intentos."""
     now = utcnow()
@@ -327,9 +338,14 @@ def fail_job(
         job.updated_at = now
 
         if retryable and job.attempts < job.max_attempts:
+            delay = (
+                backoff_override_seconds
+                if backoff_override_seconds is not None
+                else backoff_seconds(job.attempts)
+            )
             job.status = "queued"
             job.stage = "retry"
-            job.next_run_at = now + timedelta(seconds=backoff_seconds(job.attempts))
+            job.next_run_at = now + timedelta(seconds=delay)
             session.add(job)
             session.commit()
             session.refresh(job)
@@ -340,7 +356,8 @@ def fail_job(
         job.finished_at = now
         job.next_run_at = None
         session.add(job)
-        _set_project_status(session, job.project_id, "failed")
+        if job.type != "publish":
+            _set_project_status(session, job.project_id, "failed")
         record_event(
             session,
             event_type="job.failed",
@@ -375,7 +392,8 @@ def cancel_job(engine: Engine, job_id: str) -> Job:
             job.finished_at = now
             job.next_run_at = None
             job.updated_at = now
-            _set_project_status(session, job.project_id, "cancelled")
+            if job.type != "publish":
+                _set_project_status(session, job.project_id, "cancelled")
         else:
             job.cancel_requested = True
             job.updated_at = now
@@ -399,7 +417,8 @@ def mark_cancelled(engine: Engine, job_id: str) -> Job:
         job.finished_at = now
         job.updated_at = now
         session.add(job)
-        _set_project_status(session, job.project_id, "cancelled")
+        if job.type != "publish":
+            _set_project_status(session, job.project_id, "cancelled")
         session.commit()
         session.refresh(job)
     return job
@@ -438,7 +457,8 @@ def recover_orphans(engine: Engine, *, stale_seconds: int) -> int:
                 job.stage = "failed"
                 job.finished_at = utcnow()
                 job.error = "trabajo huérfano: se agotaron los intentos tras una caída"
-                _set_project_status(session, job.project_id, "failed")
+                if job.type != "publish":
+                    _set_project_status(session, job.project_id, "failed")
                 record_event(
                     session,
                     event_type="job.failed",

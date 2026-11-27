@@ -6,9 +6,9 @@ palabra a palabra, siguiendo las reglas de una campaña, los revisa en una web y
 de YouTube, TikTok e Instagram ya configuradas.
 
 > Estado: **pipeline local completo, API/cola SSE, reglas de campaña (`/campaigns`), gestión de cuentas
-> sociales (`/accounts`) e interfaz web de proyectos y revisión de clips 9:16**. La publicación multi-red
-> (`add-publishers`) y controles avanzados de edición (`add-clip-editor-controls`) llegan en los
-> siguientes changes de OpenSpec.
+> sociales (`/accounts`), publicación y programación multi-cuenta (`/publications`) e interfaz web de
+> proyectos y revisión de clips 9:16**. Los controles avanzados de edición (`add-clip-editor-controls`)
+> llegan en el siguiente change de OpenSpec.
 
 ## Requisitos
 
@@ -219,8 +219,8 @@ curl -s -X POST http://127.0.0.1:8000/api/campaigns/parse \
 ```
 
 La cola vive en la tabla `job`: un trabajo pesado a la vez (GPU/MLX/ffmpeg), concurrencia ligera
-configurable, reintentos con backoff, cancelación cooperativa y recuperación de huérfanos al
-reiniciar. `publish` está reservado para el change 8 y falla de forma controlada sin reintentos.
+configurable, jobs diferidos con `run_at`, reintentos con backoff, cancelación cooperativa y
+recuperación de huérfanos al reiniciar. Los jobs `publish` se ejecutan fuera del semáforo GPU.
 
 ## Interfaz web y cliente API tipado
 
@@ -247,13 +247,51 @@ Rutas principales:
 - `/projects/[id]`: stepper en vivo de las 4 etapas (`Descarga → Transcripción → Selección → Render`)
   con cancelación, filtro `"Alertas"`, grid responsive de cards 9:16 con `hover-play`, alertas de
   `rule_violations`, reproductor, edición de metadatos, recorte con mini timeline y re-renderizado,
-  descarga MP4, eliminación y multiselección (con `"Publicar en redes →"` reservado para el change 8).
+  descarga MP4, eliminación, publicación individual y multiselección con `"Publicar en redes →"`.
 - `/accounts`: gestión multi-cuenta para YouTube, TikTok e Instagram con tarjetas agrupadas,
   badges de método (`API Oficial` / `Playwright`) y estado (`Conectada` / `Expirada` / `Error`),
   cuenta por defecto por plataforma, renombrado de alias, prueba de conexión en vivo, reconexión,
   eliminación con confirmación y diálogo `"+ Conectar cuenta"` (OAuth oficial, navegador persistente
   e importación de tokens locales en modo solo lectura).
+- `/publications`: historial multi-cuenta filtrable por estado (`Programadas`, `Publicando`,
+  `Publicadas`, `Con error`, `Canceladas`), plataforma, cuenta y proyecto, con progreso en vivo vía
+  SSE, enlace externo, visor modal `"Ver captura"`, botón `"Reintentar"` en fallidas y `"Cancelar"`
+  en programadas.
 - `/settings/status`: comprobaciones reales de `GET /api/health`.
+
+## Publicación y programación multi-cuenta
+
+Desde `/projects/[id]` puedes publicar uno o varios clips renderizados en múltiples cuentas a la vez
+(cada par `clip × cuenta` genera un registro en `publication` y un job `publish` independiente con
+idempotencia por `external_id` y límites diarios por cuenta):
+
+- **YouTube Shorts (YouTube Data API v3):** sube con `MediaFileUpload` reanudable, valida título
+  `<= 100` caracteres, añade descripción/tags/categoría/idioma/privacidad, soporta programación nativa
+  en servidor (`privacyStatus="private"` + `publishAt`), miniatura personalizada y comentario inicial
+  como pasos secundarios no fatales.
+  - **Cuota diaria:** cada `videos.insert` consume ~1 600 unidades de la cuota estándar de **10 000
+    unidades/día** (~6 subidas/día por proyecto Google). WinClip muestra el consumo diario estimado en
+    `/api/publications/quota` y en el diálogo `"Publicar"`; ante `quotaExceeded` detiene el job sin
+    reintentos ciegos.
+- **TikTok (Content Posting API v2):** usa **Direct Post** (`video/init`) cuando la cuenta tiene el
+  scope auditado `video.publish`; si solo dispone de `video.upload`, degrada automáticamente a
+  **Borrador Inbox** (`inbox/video/init`, `delivery_mode="inbox"`) mostrando un aviso claro para
+  completar la publicación desde la app móvil de TikTok.
+- **Instagram Reels (Instagram Graph API):** usa subida reanudable binaria directa desde tu disco
+  local hacia `rupload.facebook.com` (`upload_type=resumable`), sin exponer WinClip a internet ni
+  depender de buckets en la nube; espera a que el contenedor alcance `FINISHED` antes de llamar a
+  `media_publish`.
+- **Programación diferida:** YouTube programa directamente en los servidores de Google. Para TikTok e
+  Instagram, WinClip guarda el job con `run_at = scheduled_at` y lo dispara desde el worker local
+  (requiere que WinClip y el worker estén activos a la hora programada; si el retraso supera la
+  ventana configurada `PUBLISH_MISSED_SCHEDULE_WINDOW_SECONDS`, falla de forma segura para evitar
+  publicaciones tardías inesperadas).
+- **Respaldo Playwright (TikTok e Instagram) — Advertencia de ToS:** los Términos de Servicio de
+  TikTok e Instagram restringen la automatización web; prioriza siempre las APIs oficiales. El
+  respaldo Playwright usa navegador visible, pausas humanas, perfiles aislados, límite diario
+  conservador (5/día) y capturas por paso bajo `STORAGE_DIR/publications/<id>/steps/`. Ante cualquier
+  CAPTCHA, verificación humana, 2FA o sesión expirada, WinClip **se detiene inmediatamente** sin
+  intentar resolver ni evadir el reto y guarda la captura diagnóstica para revisión manual.
 
 ## Cuentas sociales (OAuth, navegador e importación local)
 

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from winclip.pipeline.render_models import ReframeMode
 from winclip.pipeline.subtitles.presets import SubtitlePreset
+from winclip.publishers.base import DeliveryMode, PublishMeta
 from winclip.rules.schema import CampaignRules, RuleViolation, TemplateLanguage
 
 Language = Literal["auto", "es", "en"]
@@ -413,3 +414,132 @@ class TokenImportRequest(BaseModel):
     path: str = Field(min_length=1, max_length=1000)
     platform: AccountPlatform | None = None
     alias: str | None = Field(default=None, max_length=120)
+
+
+# --------------------------------------------------------------------------- publicaciones
+
+
+PublicationStatus = Literal["scheduled", "publishing", "published", "failed", "cancelled"]
+
+
+class AccountQuotaOut(BaseModel):
+    """Resumen de uso diario y límite por cuenta."""
+
+    account_id: str
+    platform: AccountPlatform
+    auth_method: AccountAuthMethod
+    display_name: str
+    handle: str
+    alias: str | None = None
+    used_today: int
+    daily_limit: int
+    remaining_today: int
+
+
+class QuotaSummaryOut(BaseModel):
+    """Resumen global de cuota YouTube y límites diarios por cuenta."""
+
+    youtube_units_used: int
+    youtube_units_limit: int
+    youtube_upload_cost: int
+    youtube_uploads_today: int
+    accounts: list[AccountQuotaOut] = Field(default_factory=list)
+
+
+class PreviewMetaRequest(BaseModel):
+    """Cuerpo de `POST /api/publications/preview-meta`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clip_ids: list[str] = Field(min_length=1)
+    account_ids: list[str] = Field(min_length=1)
+
+
+class PreviewMetaItemOut(BaseModel):
+    """Metadatos propuestos para un par `(clip_id, account_id)`."""
+
+    clip_id: str
+    account_id: str
+    platform: AccountPlatform
+    auth_method: AccountAuthMethod
+    delivery_mode: DeliveryMode
+    meta: PublishMeta
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PreviewMetaOut(BaseModel):
+    """Respuesta de `POST /api/publications/preview-meta`."""
+
+    items: list[PreviewMetaItemOut]
+    warnings: list[str] = Field(default_factory=list)
+    quota: QuotaSummaryOut
+
+
+class PublicationCreateItem(BaseModel):
+    """Un par `(clip, cuenta)` a encolar para publicación o programación."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clip_id: str = Field(min_length=1)
+    account_id: str = Field(min_length=1)
+    meta: PublishMeta
+    scheduled_at: datetime | None = None
+
+
+class PublicationsCreateRequest(BaseModel):
+    """Cuerpo de `POST /api/publications`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[PublicationCreateItem] = Field(min_length=1)
+    force: bool = False
+
+
+class PublicationCancelRequest(BaseModel):
+    """Cuerpo opcional de `POST /api/publications/{id}/cancel`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    delete_remote: bool = False
+
+
+class PublicationOut(BaseModel):
+    """Registro de publicación enriquecido para el historial `/publications`."""
+
+    id: str
+    workspace_id: str
+    clip_id: str
+    project_id: str | None = None
+    project_title: str | None = None
+    clip_title: str = ""
+    clip_thumb_url: str | None = None
+    account_id: str
+    account_platform: AccountPlatform
+    account_auth_method: AccountAuthMethod
+    account_display_name: str = ""
+    account_handle: str = ""
+    account_alias: str | None = None
+    job_id: str | None = None
+    job_progress: float = 0.0
+    job_stage: str | None = None
+    status: PublicationStatus
+    delivery_mode: DeliveryMode
+    scheduled_at: datetime | None = None
+    published_at: datetime | None = None
+    meta: PublishMeta
+    external_id: str | None = None
+    external_url: str | None = None
+    error: str | None = None
+    error_code: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+    has_screenshot: bool = False
+    screenshot_url: str | None = None
+    attempts: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class PublicationDetailOut(PublicationOut):
+    """Detalle completo de publicación incluyendo capturas por paso."""
+
+    step_screenshots: list[str] = Field(default_factory=list)

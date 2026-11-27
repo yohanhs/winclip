@@ -36,6 +36,11 @@ def new_job_id() -> str:
     return new_ulid()
 
 
+def new_publication_id() -> str:
+    """Identificador de publicación: un ULID en minúsculas."""
+    return new_ulid()
+
+
 def validate_ulid(value: str) -> str:
     """Valida un ULID (26 caracteres Crockford en minúsculas) y lo devuelve."""
     if not isinstance(value, str) or not _ULID_PATTERN.fullmatch(value):

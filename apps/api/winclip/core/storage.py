@@ -115,6 +115,14 @@ class LocalStorage:
     def llm_cache_dir(self) -> Path:
         return self.path(CACHE_DIR, LLM_CACHE_DIR)
 
+    def publication_dir(self, publication_id: str) -> Path:
+        """`publications/<publication_id>/` para capturas diagnósticas de publicación."""
+        return self.path("publications", validate_project_id(publication_id))
+
+    def publication_steps_dir(self, publication_id: str) -> Path:
+        """`publications/<publication_id>/steps/` para capturas por paso."""
+        return self.publication_dir(publication_id) / "steps"
+
     def llm_cache_path(self, cache_key: str) -> Path:
         """`cache/llm/<sha256>.json`, validando que la clave sea un SHA-256 hexadecimal."""
         if not _CACHE_KEY_PATTERN.fullmatch(cache_key):

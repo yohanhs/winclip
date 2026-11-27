@@ -19,7 +19,7 @@ from sqlmodel import Session, select
 
 from winclip.core.config import Settings
 from winclip.core.ids import new_clip_id
-from winclip.core.models import Campaign, Clip, Job, Project, utcnow
+from winclip.core.models import Campaign, Clip, Job, Project, Publication, SocialAccount, utcnow
 from winclip.core.storage import LocalStorage
 from winclip.pipeline.ingest import extract_audio, probe_media
 from winclip.pipeline.ingest import ingest as run_ingest
@@ -28,8 +28,20 @@ from winclip.pipeline.render_models import RenderOptions, RenderProgress
 from winclip.pipeline.schemas import SourceMeta
 from winclip.pipeline.select import ClipCandidate, SelectionError, select_clips
 from winclip.pipeline.transcribe import transcribe as run_transcribe
+from winclip.publishers.base import (
+    DailyLimitExceededError,
+    MissedScheduleWindowError,
+    PermanentPublishError,
+    PublishError,
+    PublishMeta,
+    PublishValidationError,
+)
+from winclip.publishers.quota import count_today_publications, daily_limit_for_account
+from winclip.publishers.registry import get_publisher
 from winclip.rules.schema import CampaignRules
 from winclip.worker import queue
+
+PUBLISH_BACKOFF_SCHEDULE = (30.0, 120.0, 600.0)
 
 PIPELINE_STAGES = ("ingest", "transcribe", "select", "render")
 HEAVY_STAGES = frozenset({"transcribe", "render"})
@@ -476,8 +488,200 @@ HANDLERS: dict[str, Callable[[JobContext, Project, PipelineBackends], None]] = {
 }
 
 
-def handle_publish(_ctx: JobContext, _project: Project, _backends: PipelineBackends) -> None:
-    raise ReservedJobTypeError(RESERVED_PUBLISH_MESSAGE)
+def _emit_publication_event(
+    engine: Engine,
+    pub: Publication,
+    *,
+    project_id: str | None,
+    progress: float | None = None,
+    stage: str | None = None,
+) -> None:
+    payload: dict[str, Any] = {
+        "publication_id": pub.id,
+        "clip_id": pub.clip_id,
+        "account_id": pub.account_id,
+        "project_id": project_id,
+        "job_id": pub.job_id,
+        "status": pub.status,
+        "delivery_mode": pub.delivery_mode,
+        "external_id": pub.external_id,
+        "external_url": pub.external_url,
+        "error": pub.error,
+        "error_code": pub.error_code,
+        "warnings": list(pub.warnings_json or []),
+        "has_screenshot": bool(pub.screenshot_path),
+    }
+    if progress is not None:
+        payload["progress"] = progress
+    if stage is not None:
+        payload["stage"] = stage
+    queue.emit_event(
+        engine,
+        event_type="publication.updated",
+        project_id=project_id,
+        job_id=pub.job_id,
+        payload=payload,
+    )
+
+
+def _publish_backoff(attempts: int) -> float:
+    idx = max(0, min(len(PUBLISH_BACKOFF_SCHEDULE) - 1, attempts - 1))
+    return PUBLISH_BACKOFF_SCHEDULE[idx]
+
+
+def handle_publish(ctx: JobContext, _project: Project | None, _backends: PipelineBackends) -> None:
+    """Ejecuta un trabajo `publish` para un registro `Publication`."""
+    publication_id = str(ctx.job.payload.get("publication_id") or "").strip()
+    if not publication_id:
+        raise PublishValidationError("El trabajo publish necesita payload.publication_id")
+
+    with Session(ctx.engine) as session:
+        pub = session.get(Publication, publication_id)
+        if pub is None:
+            raise PublishValidationError(f"No existe la publicación {publication_id}")
+        if pub.status == "cancelled":
+            raise JobCancelled("publicación cancelada por el usuario")
+
+        clip = session.get(Clip, pub.clip_id)
+        if clip is None:
+            raise PublishValidationError(f"No existe el clip {pub.clip_id}")
+        account = session.get(SocialAccount, pub.account_id)
+        if account is None:
+            raise PublishValidationError(f"No existe la cuenta {pub.account_id}")
+
+        project_id = clip.project_id
+
+        # Ventana de programación perdida (solo para jobs diferidos con run_at)
+        if ctx.job.run_at is not None:
+            run_at = ctx.job.run_at
+            now = utcnow()
+            now_cmp = now.replace(tzinfo=None) if run_at.tzinfo is None else now
+            late_seconds = (now_cmp - run_at).total_seconds()
+            if late_seconds > ctx.settings.publish_missed_schedule_window_seconds:
+                raise MissedScheduleWindowError(
+                    "Se superó la ventana de programación diferida mientras WinClip estuvo "
+                    "apagado. Reintenta o reprograma la publicación manualmente."
+                )
+
+        # Límite diario por cuenta (omitir si se autorizó `force` o si ya tiene `external_id`)
+        force_limit = bool(ctx.job.payload.get("force_daily_limit"))
+        if not force_limit and not pub.external_id:
+            used_today = count_today_publications(
+                session, account.id, exclude_publication_id=pub.id
+            )
+            limit = daily_limit_for_account(account, ctx.settings)
+            if used_today >= limit:
+                raise DailyLimitExceededError(
+                    f"La cuenta {account.display_name or account.handle} alcanzó su límite diario "
+                    f"({used_today}/{limit})."
+                )
+
+        pub.status = "publishing"
+        pub.attempts = int(pub.attempts or 0) + 1
+        pub.error = None
+        pub.error_code = None
+        pub.updated_at = utcnow()
+        session.add(pub)
+        session.commit()
+        session.refresh(pub)
+        _emit_publication_event(ctx.engine, pub, project_id=project_id, progress=5.0, stage="start")
+
+        meta_dict = dict(pub.meta_json or {})
+        meta = PublishMeta.model_validate(meta_dict)
+        meta.publication_id = pub.id
+        meta.existing_external_id = pub.external_id
+        meta.existing_external_url = pub.external_url
+        if pub.scheduled_at is not None:
+            meta.scheduled_at = pub.scheduled_at
+
+        def on_progress(percent: float, stage: str) -> None:
+            ctx.progress(percent, stage)
+            _emit_publication_event(
+                ctx.engine, pub, project_id=project_id, progress=percent, stage=stage
+            )
+
+        publisher = get_publisher(
+            account,
+            settings=ctx.settings,
+            session=session,
+            on_progress=on_progress,
+        )
+        result = publisher.publish(clip, account, meta)
+
+        pub.status = result.status
+        pub.delivery_mode = result.delivery_mode
+        if result.external_id:
+            pub.external_id = result.external_id
+        if result.external_url:
+            pub.external_url = result.external_url
+        pub.warnings_json = list(result.warnings)
+        if result.screenshot_path:
+            pub.screenshot_path = result.screenshot_path
+        if result.status == "published":
+            pub.published_at = utcnow()
+        pub.error = None
+        pub.error_code = None
+        pub.updated_at = utcnow()
+        session.add(pub)
+        session.commit()
+        session.refresh(pub)
+        _emit_publication_event(
+            ctx.engine, pub, project_id=project_id, progress=100.0, stage="done"
+        )
+
+
+def _handle_publish_error(
+    engine: Engine,
+    job: Job,
+    exc: Exception,
+) -> Job:
+    """Persiste el estado de fallo o reintento en `Publication` y en la cola `Job`."""
+    publication_id = str(job.payload.get("publication_id") or "").strip()
+    is_publish_err = isinstance(exc, PublishError)
+    retryable = bool(exc.retryable) if is_publish_err else False
+    err_code = exc.code if is_publish_err else "publish_error"
+    err_msg = str(exc) or type(exc).__name__
+    will_retry = retryable and job.attempts < job.max_attempts
+
+    if publication_id:
+        with Session(engine) as session:
+            pub = session.get(Publication, publication_id)
+            if pub is not None:
+                if is_publish_err and exc.external_id:
+                    pub.external_id = exc.external_id
+                if is_publish_err and exc.external_url:
+                    pub.external_url = exc.external_url
+                if is_publish_err and exc.screenshot_path:
+                    pub.screenshot_path = exc.screenshot_path
+                pub.error = err_msg[:2000]
+                pub.error_code = err_code
+                pub.status = "scheduled" if will_retry else "failed"
+                pub.updated_at = utcnow()
+                session.add(pub)
+
+                if err_code == "session_expired":
+                    account = session.get(SocialAccount, pub.account_id)
+                    if account is not None:
+                        account.status = "expired"
+                        account.last_error = err_msg[:500]
+                        account.updated_at = utcnow()
+                        session.add(account)
+
+                clip = session.get(Clip, pub.clip_id)
+                project_id = clip.project_id if clip is not None else job.project_id
+                session.commit()
+                session.refresh(pub)
+                _emit_publication_event(
+                    engine, pub, project_id=project_id, stage="retry" if will_retry else "failed"
+                )
+
+    return queue.fail_job(
+        engine,
+        job.id,
+        err_msg,
+        retryable=retryable,
+        backoff_override_seconds=_publish_backoff(job.attempts) if will_retry else None,
+    )
 
 
 def handle_job(
@@ -504,7 +708,7 @@ def handle_job(
     )
     try:
         if job.type == "publish":
-            handle_publish(ctx, _project(engine, job.project_id), backends)
+            handle_publish(ctx, None, backends)
             return queue.complete_job(engine, job_id)
         project = _project(engine, job.project_id)
         handler = HANDLERS.get(job.type)
@@ -516,5 +720,15 @@ def handle_job(
         return queue.mark_cancelled(engine, job_id)
     except (ReservedJobTypeError, SelectionError) as exc:
         return queue.fail_job(engine, job_id, str(exc), retryable=False)
+    except PublishError as exc:
+        if job.type == "publish":
+            return _handle_publish_error(engine, job, exc)
+        return queue.fail_job(engine, job_id, str(exc), retryable=exc.retryable)
     except Exception as exc:
+        if job.type == "publish":
+            return _handle_publish_error(
+                engine,
+                job,
+                PermanentPublishError(f"{type(exc).__name__}: {exc}"),
+            )
         return queue.fail_job(engine, job_id, f"{type(exc).__name__}: {exc}", retryable=True)

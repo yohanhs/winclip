@@ -24,10 +24,12 @@ JOB_TYPES = ("ingest", "transcribe", "select", "render", "pipeline", "publish")
 JOB_STATUSES = ("queued", "running", "done", "failed", "cancelled")
 HEAVY_JOB_TYPES = frozenset({"transcribe", "render"})
 TERMINAL_JOB_STATUSES = frozenset({"done", "failed", "cancelled"})
-JOB_EVENT_TYPES = ("job.progress", "job.done", "job.failed", "clip.ready")
+JOB_EVENT_TYPES = ("job.progress", "job.done", "job.failed", "clip.ready", "publication.updated")
 ACCOUNT_PLATFORMS = ("youtube", "tiktok", "instagram")
 ACCOUNT_AUTH_METHODS = ("api", "playwright")
 ACCOUNT_STATUSES = ("pending", "connected", "expired", "error")
+PUBLICATION_STATUSES = ("scheduled", "publishing", "published", "failed", "cancelled")
+PUBLICATION_DELIVERY_MODES = ("direct", "inbox")
 
 
 def utcnow() -> datetime:
@@ -130,6 +132,7 @@ class Job(SQLModel, table=True):
     error: str | None = None
     attempts: int = Field(default=0)
     max_attempts: int = Field(default=3)
+    run_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
     next_run_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
     worker_id: str | None = Field(default=None, max_length=64)
     heartbeat_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
@@ -177,5 +180,39 @@ class SocialAccount(SQLModel, table=True):
     token_expires_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
     last_check_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
     last_error: str | None = None
+    created_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
+    updated_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
+
+
+class Publication(SQLModel, table=True):
+    """Publicación o programación de un clip en una cuenta social (`docs/architecture.md §7`)."""
+
+    __tablename__ = "publication"
+
+    id: str = Field(primary_key=True)
+    workspace_id: str = Field(foreign_key="workspace.id", index=True)
+    clip_id: str = Field(foreign_key="clip.id", index=True)
+    account_id: str = Field(foreign_key="social_account.id", index=True)
+    job_id: str | None = Field(
+        default=None,
+        sa_column=Column(
+            String(64),
+            ForeignKey("job.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
+    status: str = Field(default="scheduled", max_length=16, index=True)
+    delivery_mode: str = Field(default="direct", max_length=16)
+    scheduled_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
+    published_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
+    meta_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    external_id: str | None = Field(default=None, max_length=255)
+    external_url: str | None = None
+    error: str | None = None
+    error_code: str | None = Field(default=None, max_length=64)
+    warnings_json: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    screenshot_path: str | None = None
+    attempts: int = Field(default=0)
     created_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
     updated_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)

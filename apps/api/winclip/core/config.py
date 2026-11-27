@@ -84,6 +84,16 @@ class Settings(BaseSettings):
     upload_max_bytes: int = Field(default=10 * 1024**3, gt=0)
     sse_heartbeat_seconds: float = Field(default=15.0, gt=0)
 
+    # Publicación multi-cuenta y cuotas (change 8)
+    playwright_headless: bool = False
+    publish_missed_schedule_window_seconds: int = Field(default=7200, ge=60)
+    publish_daily_limit_youtube_api: int = Field(default=6, ge=1)
+    publish_daily_limit_tiktok_api: int = Field(default=10, ge=1)
+    publish_daily_limit_instagram_api: int = Field(default=25, ge=1)
+    publish_daily_limit_playwright: int = Field(default=5, ge=1)
+    youtube_daily_quota_units: int = Field(default=10000, ge=1600)
+    youtube_upload_quota_cost: int = Field(default=1600, ge=1)
+
     @field_validator("storage_dir")
     @classmethod
     def _resolve_storage_dir(cls, value: Path) -> Path:

@@ -130,7 +130,7 @@ def test_publish_fails_without_retries(env) -> None:
     final = handle_job(engine, job.id, settings=settings, backends=FakePipeline(storage).backends())
 
     assert final.status == "failed"
-    assert final.error is not None and "reservado" in final.error
+    assert final.error is not None and "publication_id" in final.error
     assert final.finished_at is not None
     assert final.next_run_at is None
 

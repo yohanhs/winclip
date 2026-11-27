@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from winclip.core.models import Campaign, Clip, Job, Project, SocialAccount
+from winclip.core.models import Campaign, Clip, Job, Project, Publication, SocialAccount
+from winclip.core.storage import LocalStorage
+from winclip.publishers.base import PublishMeta
 from winclip.routers.schemas import (
     CampaignOut,
     ClipOut,
     JobOut,
     JobSummary,
     ProjectOut,
+    PublicationDetailOut,
+    PublicationOut,
     SocialAccountOut,
 )
 from winclip.rules.schema import CampaignRules, RuleViolation
@@ -164,3 +168,76 @@ def social_account_out(account: SocialAccount) -> SocialAccountOut:
         created_at=account.created_at,
         updated_at=account.updated_at,
     )
+
+
+def publication_out(
+    session: Session,
+    pub: Publication,
+    *,
+    clip: Clip | None = None,
+    project: Project | None = None,
+    account: SocialAccount | None = None,
+    job: Job | None = None,
+) -> PublicationOut:
+    """Serializa `Publication` enriquecida con datos del clip, proyecto, cuenta y job."""
+    clip_obj = clip or session.get(Clip, pub.clip_id)
+    project_obj = project or (
+        session.get(Project, clip_obj.project_id) if clip_obj is not None else None
+    )
+    account_obj = account or session.get(SocialAccount, pub.account_id)
+    job_obj = job or (session.get(Job, pub.job_id) if pub.job_id else None)
+
+    meta = PublishMeta.model_validate(pub.meta_json or {})
+    has_shot = bool(pub.screenshot_path)
+    return PublicationOut(
+        id=pub.id,
+        workspace_id=pub.workspace_id,
+        clip_id=pub.clip_id,
+        project_id=clip_obj.project_id if clip_obj is not None else None,
+        project_title=project_obj.title if project_obj is not None else None,
+        clip_title=clip_obj.title if clip_obj is not None else "",
+        clip_thumb_url=(
+            f"/api/clips/{clip_obj.id}/thumb"
+            if clip_obj is not None and clip_obj.status == "rendered" and clip_obj.thumb_path
+            else None
+        ),
+        account_id=pub.account_id,
+        account_platform=(account_obj.platform if account_obj is not None else "youtube"),  # type: ignore[arg-type]
+        account_auth_method=(account_obj.auth_method if account_obj is not None else "api"),  # type: ignore[arg-type]
+        account_display_name=account_obj.display_name if account_obj is not None else "",
+        account_handle=account_obj.handle if account_obj is not None else "",
+        account_alias=account_obj.alias if account_obj is not None else None,
+        job_id=pub.job_id,
+        job_progress=float(job_obj.progress) if job_obj is not None else 0.0,
+        job_stage=job_obj.stage if job_obj is not None else None,
+        status=pub.status,  # type: ignore[arg-type]
+        delivery_mode=pub.delivery_mode,  # type: ignore[arg-type]
+        scheduled_at=pub.scheduled_at,
+        published_at=pub.published_at,
+        meta=meta,
+        external_id=pub.external_id,
+        external_url=pub.external_url,
+        error=pub.error,
+        error_code=pub.error_code,
+        warnings=list(pub.warnings_json or []),
+        has_screenshot=has_shot,
+        screenshot_url=f"/api/publications/{pub.id}/screenshot" if has_shot else None,
+        attempts=pub.attempts,
+        created_at=pub.created_at,
+        updated_at=pub.updated_at,
+    )
+
+
+def publication_detail_out(
+    session: Session,
+    pub: Publication,
+    storage: LocalStorage,
+) -> PublicationDetailOut:
+    """Extiende `PublicationOut` con la lista de capturas de pasos en disco."""
+    base = publication_out(session, pub)
+    steps_dir = storage.publication_steps_dir(pub.id)
+    steps: list[str] = []
+    if steps_dir.is_dir():
+        for png in sorted(steps_dir.glob("*.png")):
+            steps.append(png.name)
+    return PublicationDetailOut(**base.model_dump(), step_screenshots=steps)
