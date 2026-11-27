@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 import type {
+  AccountsOAuthConfigOut,
+  BrowserLoginStartRequest,
   CampaignCreate,
   CampaignOut,
   CampaignParseOut,
@@ -10,7 +12,10 @@ import type {
   HealthResponse,
   JobOut,
   ProjectOut,
+  SocialAccountOut,
+  SocialAccountUpdate,
   SubtitlePreset,
+  TokenImportRequest,
 } from "@winclip/api-client";
 
 /** PNG 1x1 válido para evitar peticiones rotas en miniaturas. */
@@ -211,10 +216,38 @@ export function createSampleCampaign(
   };
 }
 
+export function createSampleAccount(
+  overrides: Partial<SocialAccountOut> = {},
+): SocialAccountOut {
+  return {
+    id: "acc-e2e-1",
+    workspace_id: "ws-default",
+    platform: "youtube",
+    display_name: "HookVault",
+    handle: "@hookvault",
+    alias: "Canal Principal",
+    avatar_url: null,
+    auth_method: "api",
+    status: "connected",
+    is_default: true,
+    capabilities: { direct_post: true },
+    external_account_id: "UC_E2E_1",
+    token_expires_at: "2027-01-01T00:00:00Z",
+    last_check_at: "2026-11-26T10:00:00Z",
+    last_error: null,
+    created_at: "2026-11-26T09:00:00Z",
+    updated_at: "2026-11-26T10:00:00Z",
+    ...overrides,
+  };
+}
+
 export interface MockApiState {
   projects: ProjectOut[];
   clipsByProject: Record<string, ClipOut[]>;
   campaigns: CampaignOut[];
+  accounts: SocialAccountOut[];
+  accountsOAuthConfig: AccountsOAuthConfigOut;
+  browserLoginStatuses: Record<string, "waiting" | "connected" | "cancelled">;
   campaignTemplates: CampaignTemplateOut[];
   parseResponse: CampaignParseOut;
   presets: SubtitlePreset[];
@@ -297,7 +330,7 @@ export async function setupMockApi(
   initial?: Partial<
     Pick<
       MockApiState,
-      "projects" | "clipsByProject" | "campaigns" | "failProjectsList"
+      "projects" | "clipsByProject" | "campaigns" | "accounts" | "failProjectsList"
     >
   >,
 ): Promise<MockApiState> {
@@ -320,6 +353,23 @@ export async function setupMockApi(
       ],
     },
     campaigns: initial?.campaigns ?? [createSampleCampaign()],
+    accounts: initial?.accounts ?? [],
+    accountsOAuthConfig: {
+      platforms: [
+        { platform: "youtube", configured: true, missing: [] },
+        {
+          platform: "tiktok",
+          configured: false,
+          missing: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"],
+        },
+        {
+          platform: "instagram",
+          configured: false,
+          missing: ["META_APP_ID", "META_APP_SECRET"],
+        },
+      ],
+    },
+    browserLoginStatuses: {},
     campaignTemplates: DEFAULT_CAMPAIGN_TEMPLATES,
     parseResponse: {
       rules: {
@@ -437,6 +487,180 @@ export async function setupMockApi(
     if (pathname === "/api/presets" && method === "GET") {
       await route.fulfill({ json: state.presets });
       return;
+    }
+
+    if (pathname === "/api/accounts" && method === "GET") {
+      await route.fulfill({ json: state.accounts });
+      return;
+    }
+
+    if (pathname === "/api/accounts/config" && method === "GET") {
+      await route.fulfill({ json: state.accountsOAuthConfig });
+      return;
+    }
+
+    if (pathname === "/api/accounts/import" && method === "POST") {
+      const body = request.postDataJSON() as TokenImportRequest;
+      const created = createSampleAccount({
+        id: `acc-imp-${state.accounts.length + 1}`,
+        platform: body.platform ?? "youtube",
+        display_name: body.alias || "Cuenta Importada",
+        alias: body.alias ?? null,
+        handle: "@imported_channel",
+        status: "connected",
+        is_default: !state.accounts.some(
+          (a) => a.platform === (body.platform ?? "youtube") && a.is_default,
+        ),
+      });
+      state.accounts = [...state.accounts, created];
+      await route.fulfill({ status: 201, json: [created] });
+      return;
+    }
+
+    if (pathname === "/api/accounts/browser-login/start" && method === "POST") {
+      const body = request.postDataJSON() as BrowserLoginStartRequest;
+      const accId = body.account_id ?? `acc-pw-${state.accounts.length + 1}`;
+      if (!body.account_id) {
+        state.accounts = [
+          ...state.accounts,
+          createSampleAccount({
+            id: accId,
+            platform: body.platform,
+            display_name: `${body.platform} (navegador)`,
+            handle: "",
+            alias: body.alias ?? null,
+            auth_method: "playwright",
+            status: "pending",
+            is_default: !state.accounts.some(
+              (a) => a.platform === body.platform && a.is_default,
+            ),
+          }),
+        ];
+      }
+      state.browserLoginStatuses[accId] = "waiting";
+      await route.fulfill({
+        json: {
+          account_id: accId,
+          platform: body.platform,
+          session_status: "waiting",
+          error: null,
+        },
+      });
+      return;
+    }
+
+    const accBrowserStatusMatch = pathname.match(
+      /^\/api\/accounts\/([^/]+)\/browser-login\/status$/,
+    );
+    if (accBrowserStatusMatch && method === "GET") {
+      const accId = accBrowserStatusMatch[1]!;
+      const acc = state.accounts.find((a) => a.id === accId);
+      await route.fulfill({
+        json: {
+          account_id: accId,
+          platform: acc?.platform ?? "tiktok",
+          session_status: state.browserLoginStatuses[accId] ?? "connected",
+          error: null,
+        },
+      });
+      return;
+    }
+
+    const accBrowserConfirmMatch = pathname.match(
+      /^\/api\/accounts\/([^/]+)\/browser-login\/confirm$/,
+    );
+    if (accBrowserConfirmMatch && method === "POST") {
+      const accId = accBrowserConfirmMatch[1]!;
+      state.browserLoginStatuses[accId] = "connected";
+      state.accounts = state.accounts.map((a) =>
+        a.id === accId ? { ...a, status: "connected", last_error: null } : a,
+      );
+      const acc = state.accounts.find((a) => a.id === accId);
+      await route.fulfill({
+        json: {
+          account_id: accId,
+          platform: acc?.platform ?? "tiktok",
+          session_status: "connected",
+          error: null,
+        },
+      });
+      return;
+    }
+
+    const accBrowserCancelMatch = pathname.match(
+      /^\/api\/accounts\/([^/]+)\/browser-login\/cancel$/,
+    );
+    if (accBrowserCancelMatch && method === "POST") {
+      const accId = accBrowserCancelMatch[1]!;
+      state.browserLoginStatuses[accId] = "cancelled";
+      const acc = state.accounts.find((a) => a.id === accId);
+      await route.fulfill({
+        json: {
+          account_id: accId,
+          platform: acc?.platform ?? "tiktok",
+          session_status: "cancelled",
+          error: null,
+        },
+      });
+      return;
+    }
+
+    const accCheckMatch = pathname.match(/^\/api\/accounts\/([^/]+)\/check$/);
+    if (accCheckMatch && method === "POST") {
+      const accId = accCheckMatch[1]!;
+      let updated: SocialAccountOut | undefined;
+      state.accounts = state.accounts.map((a) => {
+        if (a.id !== accId) return a;
+        updated = {
+          ...a,
+          status: "connected",
+          last_error: null,
+          last_check_at: new Date().toISOString(),
+        };
+        return updated;
+      });
+      if (!updated) {
+        await route.fulfill({ status: 404, json: { detail: "No encontrada" } });
+        return;
+      }
+      await route.fulfill({ json: updated });
+      return;
+    }
+
+    const accMatch = pathname.match(/^\/api\/accounts\/([^/]+)$/);
+    if (accMatch) {
+      const accId = accMatch[1]!;
+      if (method === "PATCH") {
+        const body = request.postDataJSON() as SocialAccountUpdate;
+        const target = state.accounts.find((a) => a.id === accId);
+        if (!target) {
+          await route.fulfill({ status: 404, json: { detail: "No encontrada" } });
+          return;
+        }
+        let updated: SocialAccountOut = target;
+        state.accounts = state.accounts.map((a) => {
+          if (a.id === accId) {
+            updated = {
+              ...a,
+              alias: body.alias !== undefined ? body.alias : a.alias,
+              is_default: body.is_default !== undefined ? Boolean(body.is_default) : a.is_default,
+              updated_at: new Date().toISOString(),
+            };
+            return updated;
+          }
+          if (body.is_default === true && a.platform === target.platform) {
+            return { ...a, is_default: false };
+          }
+          return a;
+        });
+        await route.fulfill({ json: updated });
+        return;
+      }
+      if (method === "DELETE") {
+        state.accounts = state.accounts.filter((a) => a.id !== accId);
+        await route.fulfill({ status: 204 });
+        return;
+      }
     }
 
     if (pathname === "/api/campaigns" && method === "GET") {

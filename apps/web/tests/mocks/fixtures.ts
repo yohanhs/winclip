@@ -5,6 +5,7 @@ import type {
   ClipOut,
   JobSummary,
   ProjectOut,
+  SocialAccountOut,
   SubtitlePreset,
 } from "@winclip/api-client";
 
@@ -147,6 +148,31 @@ export function makeCampaignTemplate(
     description: "Clips dinámicos de entrevistas en español",
     language: "es",
     rules: makeCampaignRules({ name: "Podcast & Entrevistas ES" }),
+    ...overrides,
+  };
+}
+
+export function makeSocialAccount(
+  overrides: Partial<SocialAccountOut> = {},
+): SocialAccountOut {
+  return {
+    id: "acc-1",
+    workspace_id: "ws-1",
+    platform: "youtube",
+    display_name: "HookVault",
+    handle: "@hookvault",
+    alias: "Canal Principal",
+    avatar_url: null,
+    auth_method: "api",
+    status: "connected",
+    is_default: true,
+    capabilities: { direct_post: true },
+    external_account_id: "UC_TEST_1",
+    token_expires_at: "2027-01-01T00:00:00Z",
+    last_check_at: "2026-11-26T10:00:00Z",
+    last_error: null,
+    created_at: "2026-11-26T09:00:00Z",
+    updated_at: "2026-11-26T10:00:00Z",
     ...overrides,
   };
 }

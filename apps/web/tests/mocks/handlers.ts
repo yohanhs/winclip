@@ -192,4 +192,27 @@ export const mswHandlers = [
   http.get("/api/campaigns/templates", () => {
     return HttpResponse.json([]);
   }),
+
+  // Social accounts
+  http.get("/api/accounts", () => {
+    return HttpResponse.json([]);
+  }),
+
+  http.get("/api/accounts/config", () => {
+    return HttpResponse.json({
+      platforms: [
+        { platform: "youtube", configured: true, missing: [] },
+        {
+          platform: "tiktok",
+          configured: false,
+          missing: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"],
+        },
+        {
+          platform: "instagram",
+          configured: false,
+          missing: ["META_APP_ID", "META_APP_SECRET"],
+        },
+      ],
+    });
+  }),
 ];

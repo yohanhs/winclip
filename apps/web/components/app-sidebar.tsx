@@ -18,6 +18,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { useAccounts } from "@/hooks/use-accounts";
 import { useHealth } from "@/hooks/use-api-client";
 import { useCampaigns } from "@/hooks/use-campaigns";
 import { useProjects } from "@/hooks/use-projects";
@@ -45,6 +46,7 @@ export function AppSidebar({ appName }: { appName: string }) {
   const health = useHealth();
   const projects = useProjects();
   const campaigns = useCampaigns();
+  const accounts = useAccounts();
 
   const checks = health.data?.checks ?? [];
   const hasError = health.isError || checks.some((check) => check.status === "error");
@@ -54,6 +56,10 @@ export function AppSidebar({ appName }: { appName: string }) {
   );
   const projectCount = projects.data?.length ?? 0;
   const campaignCount = campaigns.data?.length ?? 0;
+  const accountCount = accounts.data?.length ?? 0;
+  const expiredAccountsCount = (accounts.data ?? []).filter(
+    (item) => item.status === "expired" || item.status === "error",
+  ).length;
 
   const engineStatus = hasError
     ? { label: "Motor local · Error", color: "text-rose-400" }
@@ -72,7 +78,10 @@ export function AppSidebar({ appName }: { appName: string }) {
             ? projectCount
             : href === "/campaigns"
               ? campaignCount
-              : 0;
+              : href === "/accounts"
+                ? accountCount
+                : 0;
+        const showExpiredAlert = href === "/accounts" && expiredAccountsCount > 0;
         return (
           <Link
             key={href}
@@ -90,7 +99,15 @@ export function AppSidebar({ appName }: { appName: string }) {
             {!isCompact ? (
               <>
                 <span className="flex-1 truncate">{label}</span>
-                {count > 0 ? (
+                {showExpiredAlert ? (
+                  <span
+                    data-testid="sidebar-expired-accounts"
+                    title={`${expiredAccountsCount} cuenta(s) expirada(s) o con error`}
+                    className="flex min-w-5 items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/15 px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-rose-300"
+                  >
+                    {expiredAccountsCount > 99 ? "99+" : expiredAccountsCount}
+                  </span>
+                ) : count > 0 ? (
                   <span className="flex min-w-5 items-center justify-center rounded-full bg-white/[0.06] px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-zinc-400">
                     {count > 99 ? "99+" : count}
                   </span>
