@@ -22,7 +22,7 @@
 
 ## 4. Tests E2E con Playwright + MSW, CI y documentación
 
-- [ ] 4.1 Configurar Playwright en `apps/web` (`playwright.config.ts`) con mocks MSW/interceptación SSE determinista y crear los flujos e2e en `apps/web/e2e/`: (a) listado `/projects` con estados y borrado, (b) crear proyecto en `/projects/new` (URL y subida con progreso + preview de preset), (c) `/projects/[id]` recibiendo eventos SSE hasta cards listas, editar metadatos, ajustar mini timeline y lanzar re-render, y multiselección con botón `"Publicar"` deshabilitado. Verificar ejecutando `pnpm --filter web test:e2e`.
+- [x] 4.1 Configurar Playwright en `apps/web` (`playwright.config.ts`) con mocks MSW/interceptación SSE determinista y crear los flujos e2e en `apps/web/e2e/`: (a) listado `/projects` con estados y borrado, (b) crear proyecto en `/projects/new` (URL y subida con progreso + preview de preset), (c) `/projects/[id]` recibiendo eventos SSE hasta cards listas, editar metadatos, ajustar mini timeline y lanzar re-render, y multiselección con botón `"Publicar"` deshabilitado. Verificar ejecutando `pnpm --filter web test:e2e`.
 - [ ] 4.2 Actualizar `.github/workflows/ci.yml` para ejecutar `pnpm --filter web test` y `pnpm --filter web test:e2e` (con Chromium en headless), y documentar `pnpm gen:api` y los comandos de test web en `README.md`. Verificar que el YAML de CI es válido y los scripts documentados funcionan en local.
 
 ## 5. Verificación integrada

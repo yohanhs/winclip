@@ -131,30 +131,10 @@ export function ClipCard({
           />
         ) : null}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
-
-        <div className="absolute left-2 top-2 flex items-center gap-1.5">
-          <Badge
-            variant="outline"
-            className={cn("font-mono text-[11px] tabular-nums", scoreClasses(clip.score))}
-          >
-            {Math.round(clip.score)}/100
-          </Badge>
-        </div>
-
-        <div className="absolute right-2 top-2">
-          <Checkbox
-            checked={selected}
-            onCheckedChange={(checked) =>
-              onToggleSelect(clip.id, checked === true)
-            }
-            aria-label={`Seleccionar ${clip.title}`}
-            className="size-5 border-white/50 bg-black/40 data-[state=checked]:border-amber-400 data-[state=checked]:bg-amber-500 data-[state=checked]:text-black"
-          />
-        </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
 
         {isRendering ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 text-center backdrop-blur-[2px]">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/60 text-center backdrop-blur-[2px]">
             <Loader2 className="size-6 animate-spin text-amber-400" aria-hidden="true" />
             <p className="text-xs font-medium text-zinc-200">Re-renderizando…</p>
             <p className="max-w-[80%] text-[10px] text-zinc-400">
@@ -167,7 +147,7 @@ export function ClipCard({
             onClick={() => onPlay(clip)}
             disabled={!isReady}
             aria-label={`Reproducir ${clip.title}`}
-            className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+            className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
           >
             <span className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-transform hover:scale-105">
               <Play className="size-5 translate-x-0.5" aria-hidden="true" />
@@ -175,10 +155,30 @@ export function ClipCard({
           </button>
         )}
 
-        <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-200">
+        <div className="pointer-events-none absolute left-2 top-2 z-20 flex items-center gap-1.5">
+          <Badge
+            variant="outline"
+            className={cn("font-mono text-[11px] tabular-nums", scoreClasses(clip.score))}
+          >
+            {Math.round(clip.score)}/100
+          </Badge>
+        </div>
+
+        <div className="absolute right-2 top-2 z-20">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(checked) =>
+              onToggleSelect(clip.id, checked === true)
+            }
+            aria-label={`Seleccionar ${clip.title}`}
+            className="size-5 border-white/50 bg-black/40 data-[state=checked]:border-amber-400 data-[state=checked]:bg-amber-500 data-[state=checked]:text-black"
+          />
+        </div>
+
+        <span className="pointer-events-none absolute bottom-2 right-2 z-20 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-200">
           {formatTimestamp(clip.duration)}
         </span>
-        <span className="absolute bottom-2 left-2 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
+        <span className="pointer-events-none absolute bottom-2 left-2 z-20 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
           {formatTimestamp(clip.start_sec)} → {formatTimestamp(clip.end_sec)}
         </span>
       </div>

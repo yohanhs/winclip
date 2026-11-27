@@ -45,6 +45,7 @@
     "tailwindcss": "4.3.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "4.3.5",
     "@testing-library/jest-dom": "^6.4.5",
     "@testing-library/react": "^14.3.1",

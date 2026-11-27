@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     setupFiles: ["./tests/setup/vitest.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: ["e2e/**", "node_modules/**"],
     globals: true,
     alias: {
       "@": new URL("./", import.meta.url).pathname,
