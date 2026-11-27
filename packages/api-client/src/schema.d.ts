@@ -325,6 +325,270 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Accounts
+         * @description Lista las cuentas del workspace ordenadas por plataforma, defecto y fecha.
+         */
+        get: operations["listAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Accounts Oauth Config
+         * @description Indica qué plataformas tienen configuración OAuth lista (sin exponer secretos).
+         */
+        get: operations["getAccountsOAuthConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Account
+         * @description Elimina la cuenta de SQLite y borra su directorio de credenciales/perfil en disco.
+         */
+        delete: operations["deleteAccount"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Account
+         * @description Actualiza alias y/o marca la cuenta como predeterminada de su plataforma.
+         */
+        patch: operations["updateAccount"];
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Account Endpoint
+         * @description Ejecuta comprobación de salud en vivo y refresca el token si procede.
+         */
+        post: operations["checkAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/oauth/{platform}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Account Oauth
+         * @description Genera la URL de autorización OAuth 2.0 y estado anti-CSRF para la plataforma.
+         */
+        post: operations["startAccountOAuth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/oauth/{platform}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Handle Account Oauth Callback
+         * @description Completa el intercambio OAuth y redirige a `/accounts` (o devuelve JSON si se solicita).
+         */
+        get: operations["handleAccountOAuthCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/oauth/instagram/pending/{selection_token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pending Instagram Selection
+         * @description Devuelve las cuentas Business/Creator de Instagram pendientes de selección.
+         */
+        get: operations["getPendingInstagramSelection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/oauth/instagram/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Select Instagram Accounts
+         * @description Guarda las cuentas Business/Creator de Instagram elegidas por el usuario.
+         */
+        post: operations["selectInstagramAccounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/browser-login/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Browser Login
+         * @description Crea o reutiliza una cuenta Playwright y abre Chromium visible para login manual.
+         */
+        post: operations["startBrowserLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/browser-login/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Browser Login Status
+         * @description Devuelve el estado actual del login interactivo para la cuenta.
+         */
+        get: operations["getBrowserLoginStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/browser-login/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Browser Login
+         * @description Confirma manualmente que el usuario ya completó el inicio de sesión en Chromium.
+         */
+        post: operations["confirmBrowserLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/browser-login/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Browser Login
+         * @description Cancela el login interactivo en curso y cierra la ventana de Chromium.
+         */
+        post: operations["cancelBrowserLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Account Tokens Endpoint
+         * @description Importa tokens locales existentes en modo solo lectura sin copiar archivos al repo.
+         */
+        post: operations["importAccountTokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -409,10 +673,53 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccountsOAuthConfigOut
+         * @description Estado de configuración OAuth para todas las plataformas.
+         */
+        AccountsOAuthConfigOut: {
+            /** Platforms */
+            platforms: components["schemas"]["PlatformOAuthConfigOut"][];
+        };
         /** Body_uploadCampaignWatermark */
         Body_uploadCampaignWatermark: {
             /** File */
             file: string;
+        };
+        /**
+         * BrowserLoginOut
+         * @description Estado en vivo de una sesión de login con navegador.
+         */
+        BrowserLoginOut: {
+            /** Account Id */
+            account_id: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "youtube" | "tiktok" | "instagram";
+            /**
+             * Session Status
+             * @enum {string}
+             */
+            session_status: "waiting" | "connected" | "timeout" | "cancelled" | "error";
+            /** Error */
+            error?: string | null;
+        };
+        /**
+         * BrowserLoginStartRequest
+         * @description Inicio o reconexión de login interactivo con navegador persistente.
+         */
+        BrowserLoginStartRequest: {
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "tiktok" | "instagram";
+            /** Account Id */
+            account_id?: string | null;
+            /** Alias */
+            alias?: string | null;
         };
         /**
          * CampaignCreate
@@ -650,6 +957,42 @@ export interface components {
             checks: components["schemas"]["CheckOut"][];
         };
         /**
+         * InstagramCandidateOut
+         * @description Cuenta Business/Creator de Instagram elegible tras autorizar Meta.
+         */
+        InstagramCandidateOut: {
+            /** External Account Id */
+            external_account_id: string;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /** Page Name */
+            page_name: string;
+        };
+        /**
+         * InstagramSelectRequest
+         * @description Confirmación de cuentas Business/Creator de Instagram a registrar.
+         */
+        InstagramSelectRequest: {
+            /** Selection Token */
+            selection_token: string;
+            /** External Account Ids */
+            external_account_ids: string[];
+        };
+        /**
+         * InstagramSelectionOut
+         * @description Lista temporal de cuentas elegibles de Instagram (`GET .../pending/{token}`).
+         */
+        InstagramSelectionOut: {
+            /** Selection Token */
+            selection_token: string;
+            /** Candidates */
+            candidates: components["schemas"]["InstagramCandidateOut"][];
+        };
+        /**
          * JobOut
          * @description Estado completo de un trabajo (`GET /api/jobs/{id}`).
          */
@@ -718,6 +1061,51 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * OAuthStartOut
+         * @description URL de autorización y estado anti-CSRF devueltos al iniciar OAuth.
+         */
+        OAuthStartOut: {
+            /** Auth Url */
+            auth_url: string;
+            /** State */
+            state: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "youtube" | "tiktok" | "instagram";
+        };
+        /**
+         * OAuthStartRequest
+         * @description Cuerpo opcional de `POST /api/accounts/oauth/{platform}/start`.
+         */
+        OAuthStartRequest: {
+            /** Account Id */
+            account_id?: string | null;
+            /**
+             * Direct Post
+             * @default false
+             */
+            direct_post: boolean;
+            /** Alias */
+            alias?: string | null;
+        };
+        /**
+         * PlatformOAuthConfigOut
+         * @description Disponibilidad de configuración OAuth por plataforma (sin secretos).
+         */
+        PlatformOAuthConfigOut: {
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "youtube" | "tiktok" | "instagram";
+            /** Configured */
+            configured: boolean;
+            /** Missing */
+            missing?: string[];
         };
         /**
          * ProjectCreated
@@ -798,6 +1186,73 @@ export interface components {
             message: string;
         };
         /**
+         * SocialAccountOut
+         * @description Cuenta social sin exponer jamás tokens, secretos ni rutas absolutas.
+         */
+        SocialAccountOut: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "youtube" | "tiktok" | "instagram";
+            /** Display Name */
+            display_name: string;
+            /** Handle */
+            handle: string;
+            /** Alias */
+            alias?: string | null;
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /**
+             * Auth Method
+             * @enum {string}
+             */
+            auth_method: "api" | "playwright";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "connected" | "expired" | "error";
+            /** Is Default */
+            is_default: boolean;
+            /** Capabilities */
+            capabilities?: {
+                [key: string]: unknown;
+            };
+            /** External Account Id */
+            external_account_id?: string | null;
+            /** Token Expires At */
+            token_expires_at?: string | null;
+            /** Last Check At */
+            last_check_at?: string | null;
+            /** Last Error */
+            last_error?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SocialAccountUpdate
+         * @description Actualización parcial de alias y/o cuenta por defecto (`PATCH /api/accounts/{id}`).
+         */
+        SocialAccountUpdate: {
+            /** Alias */
+            alias?: string | null;
+            /** Is Default */
+            is_default?: boolean | null;
+        };
+        /**
          * SubtitlePresetOut
          * @description Preset de subtítulos con su identificador de catálogo.
          */
@@ -844,6 +1299,18 @@ export interface components {
             max_pause_sec: number;
             /** Box Bg Color */
             box_bg_color?: string | null;
+        };
+        /**
+         * TokenImportRequest
+         * @description Importación de uno o varios tokens locales existentes en modo solo lectura.
+         */
+        TokenImportRequest: {
+            /** Path */
+            path: string;
+            /** Platform */
+            platform?: ("youtube" | "tiktok" | "instagram") | null;
+            /** Alias */
+            alias?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1523,6 +1990,436 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountOut"][];
+                };
+            };
+        };
+    };
+    getAccountsOAuthConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountsOAuthConfigOut"];
+                };
+            };
+        };
+    };
+    deleteAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    updateAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SocialAccountUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    checkAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    startAccountOAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                platform: "youtube" | "tiktok" | "instagram";
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OAuthStartRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handleAccountOAuthCallback: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+                error?: string | null;
+                error_description?: string | null;
+                format?: string | null;
+            };
+            header?: never;
+            path: {
+                platform: "youtube" | "tiktok" | "instagram";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getPendingInstagramSelection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                selection_token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstagramSelectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    selectInstagramAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstagramSelectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    startBrowserLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserLoginStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserLoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getBrowserLoginStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserLoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirmBrowserLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserLoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancelBrowserLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserLoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    importAccountTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountOut"][];
                 };
             };
             /** @description Validation Error */

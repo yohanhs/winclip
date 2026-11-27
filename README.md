@@ -5,10 +5,10 @@ clipping: a partir de un vídeo largo (URL o archivo) genera cortes verticales 9
 palabra a palabra, siguiendo las reglas de una campaña, los revisa en una web y los publica en cuentas
 de YouTube, TikTok e Instagram ya configuradas.
 
-> Estado: **pipeline local completo, API/cola SSE, reglas de campaña (`/campaigns`) e interfaz web de
-> proyectos y revisión de clips 9:16**. Las cuentas sociales (`add-social-accounts`), publicación
-> multi-red (`add-publishers`) y controles avanzados de edición (`add-clip-editor-controls`) llegan en
-> los siguientes changes de OpenSpec.
+> Estado: **pipeline local completo, API/cola SSE, reglas de campaña (`/campaigns`), gestión de cuentas
+> sociales (`/accounts`) e interfaz web de proyectos y revisión de clips 9:16**. La publicación multi-red
+> (`add-publishers`) y controles avanzados de edición (`add-clip-editor-controls`) llegan en los
+> siguientes changes de OpenSpec.
 
 ## Requisitos
 
@@ -248,7 +248,48 @@ Rutas principales:
   con cancelación, filtro `"Alertas"`, grid responsive de cards 9:16 con `hover-play`, alertas de
   `rule_violations`, reproductor, edición de metadatos, recorte con mini timeline y re-renderizado,
   descarga MP4, eliminación y multiselección (con `"Publicar en redes →"` reservado para el change 8).
+- `/accounts`: gestión multi-cuenta para YouTube, TikTok e Instagram con tarjetas agrupadas,
+  badges de método (`API Oficial` / `Playwright`) y estado (`Conectada` / `Expirada` / `Error`),
+  cuenta por defecto por plataforma, renombrado de alias, prueba de conexión en vivo, reconexión,
+  eliminación con confirmación y diálogo `"+ Conectar cuenta"` (OAuth oficial, navegador persistente
+  e importación de tokens locales en modo solo lectura).
 - `/settings/status`: comprobaciones reales de `GET /api/health`.
+
+## Cuentas sociales (OAuth, navegador e importación local)
+
+WinClip almacena las credenciales OAuth cifradas con Fernet en `STORAGE_DIR/accounts/<id>/credentials.enc`
+(permisos `0600`) usando una clave maestra guardada automáticamente en el Keychain de macOS vía `keyring`
+(o sobrescribible mediante `WINCLIP_SECRET_KEY` en `.env` para entornos headless/CI). Los perfiles de
+Playwright se aíslan en `STORAGE_DIR/accounts/<id>/profile/` (`0700`).
+
+### Configuración OAuth (`.env`, fuera del repo)
+
+- **YouTube Data API v3:** descarga el `client_secret_*.json` de una app OAuth en Google Cloud Console,
+  guárdalo fuera del repo y define `GOOGLE_CLIENT_SECRET_FILE=/ruta/client_secret.json`. Añade como
+  Redirect URI `http://localhost:8000/api/accounts/oauth/youtube/callback`.
+  > Nota: en Google Cloud Console las apps en modo *Testing* caducan los refresh tokens cada 7 días;
+  > cuando expiren, WinClip muestra el estado `Expirada` y permite reconectar en un clic.
+- **TikTok Content Posting API:** define `TIKTOK_CLIENT_KEY` y `TIKTOK_CLIENT_SECRET` con Redirect URI
+  `http://localhost:8000/api/accounts/oauth/tiktok/callback`. Si tu app solo tiene `video.upload` (sin
+  `video.publish`), la cuenta se conecta en modo **Solo inbox** (borrador).
+- **Instagram Graph (Meta):** define `META_APP_ID` y `META_APP_SECRET` con Redirect URI
+  `http://localhost:8000/api/accounts/oauth/instagram/callback`. Requiere cuentas Business o Creator
+  vinculadas a una página de Facebook; si hay varias, WinClip muestra un selector tras autorizar.
+- **Navegador persistente (Playwright):** disponible para TikTok e Instagram sin claves de API. Abre
+  Chromium visible para login manual y 2FA y persiste el perfil aislado por cuenta.
+
+### CLI e importación de tokens locales
+
+```bash
+# listar cuentas conectadas
+uv run --project apps/api winclip accounts list
+
+# comprobar salud y refrescar tokens (todas o una cuenta concreta)
+uv run --project apps/api winclip accounts check [account_id]
+
+# importar un archivo JSON o una carpeta de tokens existentes en modo solo lectura
+uv run --project apps/api winclip accounts import /ruta/a/tokens/ --alias "Canal Principal"
+```
 
 ## Estructura
 

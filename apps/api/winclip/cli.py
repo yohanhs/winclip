@@ -51,6 +51,12 @@ db_app = typer.Typer(
 )
 app.add_typer(db_app, name="db")
 
+accounts_app = typer.Typer(
+    help="Gestión de cuentas sociales (YouTube, TikTok, Instagram).",
+    no_args_is_help=True,
+)
+app.add_typer(accounts_app, name="accounts")
+
 _STATUS_STYLE = {"ok": "green", "warn": "yellow", "error": "red"}
 _STATUS_LABEL = {"ok": "ok", "warn": "aviso", "error": "error"}
 _STAGE_LABELS = {
@@ -509,6 +515,144 @@ def worker_command(
 def version() -> None:
     """Muestra la versión instalada."""
     typer.echo(__version__)
+
+
+@accounts_app.command("list")
+def accounts_list_command() -> None:
+    """Lista todas las cuentas sociales conectadas en el workspace."""
+    from sqlmodel import Session, select
+
+    from winclip.core.models import SocialAccount
+
+    settings = get_settings()
+    engine = init_db(settings)
+    console = Console()
+    with Session(engine) as session:
+        accounts = session.exec(
+            select(SocialAccount).order_by(
+                SocialAccount.platform,
+                SocialAccount.is_default.desc(),
+                SocialAccount.created_at.asc(),
+            )
+        ).all()
+
+    if not accounts:
+        console.print("[yellow]No hay cuentas sociales registradas.[/yellow]")
+        return
+
+    table = Table(title="Cuentas sociales", header_style="bold")
+    table.add_column("ID", style="dim")
+    table.add_column("Plataforma", style="bold")
+    table.add_column("Nombre / Alias")
+    table.add_column("Handle")
+    table.add_column("Método")
+    table.add_column("Estado")
+    table.add_column("Default")
+    for acc in accounts:
+        label = f"{acc.display_name} ({acc.alias})" if acc.alias else acc.display_name
+        status_color = "green" if acc.status == "connected" else "red"
+        table.add_row(
+            acc.id,
+            acc.platform,
+            label,
+            acc.handle or "—",
+            acc.auth_method,
+            f"[{status_color}]{acc.status}[/{status_color}]",
+            "★" if acc.is_default else "",
+        )
+    console.print(table)
+
+
+@accounts_app.command("check")
+def accounts_check_command(
+    account_id: Annotated[
+        str | None,
+        typer.Argument(help="ID de la cuenta a comprobar (si se omite, comprueba todas)"),
+    ] = None,
+) -> None:
+    """Comprueba la salud y refresca tokens de una o todas las cuentas sociales."""
+    from sqlmodel import Session, select
+
+    from winclip.accounts.health import check_account
+    from winclip.core.models import SocialAccount
+
+    settings = get_settings()
+    engine = init_db(settings)
+    console = Console()
+    with Session(engine) as session:
+        if account_id:
+            acc = session.get(SocialAccount, account_id)
+            if acc is None:
+                console.print(f"[red]error:[/red] no existe la cuenta {account_id}")
+                raise typer.Exit(code=1)
+            targets = [acc]
+        else:
+            targets = list(session.exec(select(SocialAccount)).all())
+
+        if not targets:
+            console.print("[yellow]No hay cuentas registradas para comprobar.[/yellow]")
+            return
+
+        has_failure = False
+        for acc in targets:
+            updated = check_account(session, acc, settings)
+            ok = updated.status == "connected"
+            if not ok:
+                has_failure = True
+            color = "green" if ok else "red"
+            detail = f" · {updated.last_error}" if updated.last_error else ""
+            console.print(
+                f"[{color}]{updated.status}[/{color}] {updated.platform} · "
+                f"{updated.display_name} ({updated.handle or updated.id}){detail}"
+            )
+
+    if has_failure:
+        raise typer.Exit(code=1)
+
+
+@accounts_app.command("import")
+def accounts_import_command(
+    path: Annotated[str, typer.Argument(help="Archivo JSON o carpeta de tokens locales")],
+    platform: Annotated[
+        str | None,
+        typer.Option("--platform", help="Plataforma esperada: youtube o tiktok"),
+    ] = None,
+    alias: Annotated[
+        str | None,
+        typer.Option("--alias", help="Alias opcional para la cuenta importada"),
+    ] = None,
+    no_check: Annotated[
+        bool,
+        typer.Option("--no-check", help="Omite la verificación remota tras importar"),
+    ] = False,
+) -> None:
+    """Importa tokens locales existentes en modo solo lectura y los cifra en STORAGE_DIR."""
+    from sqlmodel import Session
+
+    from winclip.accounts.importer import TokenImportError, import_local_tokens
+
+    settings = get_settings()
+    engine = init_db(settings)
+    console = Console()
+    with Session(engine) as session:
+        try:
+            accounts = import_local_tokens(
+                session,
+                settings,
+                path,
+                platform=platform,
+                alias=alias,
+                run_health_check=not no_check,
+            )
+        except TokenImportError as exc:
+            console.print(f"[red]error:[/red] {exc}")
+            raise typer.Exit(code=1) from exc
+
+    for acc in accounts:
+        console.print(
+            f"[green]importada:[/green] {acc.platform} · {acc.display_name} "
+            f"({acc.handle or acc.id}) · estado={acc.status}"
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover

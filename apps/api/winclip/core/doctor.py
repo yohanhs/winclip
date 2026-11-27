@@ -302,6 +302,77 @@ def check_llm_keys(settings: Settings) -> list[CheckResult]:
     ]
 
 
+def check_encryption_backend(settings: Settings) -> CheckResult:
+    """Informa qué backend de cifrado de credenciales está activo (nunca imprime claves)."""
+    from winclip.accounts.crypto import inspect_encryption_backend
+
+    status, detail, hint = inspect_encryption_backend(settings)
+    return CheckResult(name="cifrado cuentas", status=status, detail=detail, hint=hint)
+
+
+def check_social_credentials(settings: Settings) -> list[CheckResult]:
+    """Checks informativos de credenciales OAuth sociales (nunca imprime secretos)."""
+    results: list[CheckResult] = []
+
+    google_raw = settings.google_client_secret_file.strip()
+    if not google_raw:
+        results.append(
+            CheckResult(
+                name="GOOGLE_CLIENT_SECRET_FILE",
+                status="warn",
+                detail="ausente",
+                hint="define GOOGLE_CLIENT_SECRET_FILE en .env para conectar YouTube por API",
+            )
+        )
+    else:
+        google_path = Path(google_raw).expanduser()
+        if google_path.is_file():
+            results.append(
+                CheckResult(
+                    name="GOOGLE_CLIENT_SECRET_FILE",
+                    status="ok",
+                    detail=f"archivo encontrado ({google_path.name})",
+                )
+            )
+        else:
+            results.append(
+                CheckResult(
+                    name="GOOGLE_CLIENT_SECRET_FILE",
+                    status="warn",
+                    detail="ruta inexistente",
+                    hint="verifica la ruta configurada en GOOGLE_CLIENT_SECRET_FILE",
+                )
+            )
+
+    presence = settings.api_key_presence
+    tiktok_ok = presence["TIKTOK_CLIENT_KEY"] and presence["TIKTOK_CLIENT_SECRET"]
+    results.append(
+        CheckResult(
+            name="TIKTOK_OAUTH",
+            status="ok" if tiktok_ok else "warn",
+            detail="presente" if tiktok_ok else "ausente",
+            hint=(
+                None
+                if tiktok_ok
+                else "define TIKTOK_CLIENT_KEY y TIKTOK_CLIENT_SECRET en .env o usa navegador"
+            ),
+        )
+    )
+
+    meta_ok = bool(settings.meta_app_id.strip()) and presence["META_APP_SECRET"]
+    results.append(
+        CheckResult(
+            name="META_OAUTH",
+            status="ok" if meta_ok else "warn",
+            detail="presente" if meta_ok else "ausente",
+            hint=(
+                None if meta_ok else "define META_APP_ID y META_APP_SECRET en .env o usa navegador"
+            ),
+        )
+    )
+    return results
+
+
 def run_checks(settings: Settings | None = None) -> list[CheckResult]:
     """Ejecuta todos los checks en orden. Un fallo inesperado se convierte en `error`."""
     settings = settings or get_settings()
@@ -329,6 +400,18 @@ def run_checks(settings: Settings | None = None) -> list[CheckResult]:
                 )
             )
     results.extend(check_llm_keys(settings))
+    try:
+        results.append(check_encryption_backend(settings))
+    except Exception as exc:  # el doctor nunca debe romper por un check
+        results.append(
+            CheckResult(
+                name="cifrado cuentas",
+                status="warn",
+                detail=f"no se pudo comprobar ({type(exc).__name__})",
+                hint="define WINCLIP_SECRET_KEY en .env si usas entorno headless",
+            )
+        )
+    results.extend(check_social_credentials(settings))
     return results
 
 

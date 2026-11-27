@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from winclip.core.models import Campaign, Clip, Job, Project
-from winclip.routers.schemas import CampaignOut, ClipOut, JobOut, JobSummary, ProjectOut
+from winclip.core.models import Campaign, Clip, Job, Project, SocialAccount
+from winclip.routers.schemas import (
+    CampaignOut,
+    ClipOut,
+    JobOut,
+    JobSummary,
+    ProjectOut,
+    SocialAccountOut,
+)
 from winclip.rules.schema import CampaignRules, RuleViolation
 
 ACTIVE_JOB_STATUSES = ("queued", "running")
@@ -133,4 +140,27 @@ def project_out(
         active_job=job_summary(active) if active is not None else None,
         latest_job=job_summary(ordered[-1]) if ordered else None,
         jobs=[job_out(job) for job in ordered],
+    )
+
+
+def social_account_out(account: SocialAccount) -> SocialAccountOut:
+    """Serializa `SocialAccount` excluyendo `credentials_ref` y cualquier secreto."""
+    return SocialAccountOut(
+        id=account.id,
+        workspace_id=account.workspace_id,
+        platform=account.platform,  # type: ignore[arg-type]
+        display_name=account.display_name,
+        handle=account.handle,
+        alias=account.alias,
+        avatar_url=account.avatar_url,
+        auth_method=account.auth_method,  # type: ignore[arg-type]
+        status=account.status,  # type: ignore[arg-type]
+        is_default=account.is_default,
+        capabilities=dict(account.capabilities_json or {}),
+        external_account_id=account.external_account_id,
+        token_expires_at=account.token_expires_at,
+        last_check_at=account.last_check_at,
+        last_error=account.last_error,
+        created_at=account.created_at,
+        updated_at=account.updated_at,
     )

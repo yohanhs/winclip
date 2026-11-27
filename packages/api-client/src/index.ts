@@ -43,6 +43,21 @@ export type CampaignTemplateOut = Components["schemas"]["CampaignTemplateOut"];
 export type CampaignParseRequest = Components["schemas"]["CampaignParseRequest"];
 export type CampaignParseOut = Components["schemas"]["CampaignParseOut"];
 export type WatermarkUploadOut = Components["schemas"]["WatermarkUploadOut"];
+export type SocialAccountOut = Components["schemas"]["SocialAccountOut"];
+export type SocialAccountUpdate = Components["schemas"]["SocialAccountUpdate"];
+export type AccountsOAuthConfigOut = Components["schemas"]["AccountsOAuthConfigOut"];
+export type PlatformOAuthConfigOut = Components["schemas"]["PlatformOAuthConfigOut"];
+export type OAuthStartRequest = Components["schemas"]["OAuthStartRequest"];
+export type OAuthStartOut = Components["schemas"]["OAuthStartOut"];
+export type InstagramCandidateOut = Components["schemas"]["InstagramCandidateOut"];
+export type InstagramSelectionOut = Components["schemas"]["InstagramSelectionOut"];
+export type InstagramSelectRequest = Components["schemas"]["InstagramSelectRequest"];
+export type BrowserLoginStartRequest = Components["schemas"]["BrowserLoginStartRequest"];
+export type BrowserLoginOut = Components["schemas"]["BrowserLoginOut"];
+export type TokenImportRequest = Components["schemas"]["TokenImportRequest"];
+export type AccountPlatform = SocialAccountOut["platform"];
+export type AccountAuthMethod = SocialAccountOut["auth_method"];
+export type AccountStatus = SocialAccountOut["status"];
 
 /** Evento SSE tal y como lo entrega `GET /api/events`. */
 export interface SseEvent {

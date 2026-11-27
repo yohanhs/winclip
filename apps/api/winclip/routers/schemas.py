@@ -278,3 +278,138 @@ class WatermarkUploadOut(BaseModel):
     """Respuesta de `POST /api/campaigns/watermarks`."""
 
     watermark_path: str
+
+
+# --------------------------------------------------------------------------- cuentas sociales
+
+
+AccountPlatform = Literal["youtube", "tiktok", "instagram"]
+AccountAuthMethod = Literal["api", "playwright"]
+AccountStatus = Literal["pending", "connected", "expired", "error"]
+BrowserLoginSessionStatus = Literal["waiting", "connected", "timeout", "cancelled", "error"]
+
+
+class SocialAccountOut(BaseModel):
+    """Cuenta social sin exponer jamás tokens, secretos ni rutas absolutas."""
+
+    id: str
+    workspace_id: str
+    platform: AccountPlatform
+    display_name: str
+    handle: str
+    alias: str | None = None
+    avatar_url: str | None = None
+    auth_method: AccountAuthMethod
+    status: AccountStatus
+    is_default: bool
+    capabilities: dict[str, object] = Field(default_factory=dict)
+    external_account_id: str | None = None
+    token_expires_at: datetime | None = None
+    last_check_at: datetime | None = None
+    last_error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SocialAccountUpdate(BaseModel):
+    """Actualización parcial de alias y/o cuenta por defecto (`PATCH /api/accounts/{id}`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    alias: str | None = Field(default=None, max_length=120)
+    is_default: bool | None = None
+
+    @field_validator("alias")
+    @classmethod
+    def _clean_alias(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = " ".join(value.split())
+        return cleaned or None
+
+
+class OAuthStartRequest(BaseModel):
+    """Cuerpo opcional de `POST /api/accounts/oauth/{platform}/start`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    account_id: str | None = None
+    direct_post: bool = False
+    alias: str | None = Field(default=None, max_length=120)
+
+
+class OAuthStartOut(BaseModel):
+    """URL de autorización y estado anti-CSRF devueltos al iniciar OAuth."""
+
+    auth_url: str
+    state: str
+    platform: AccountPlatform
+
+
+class PlatformOAuthConfigOut(BaseModel):
+    """Disponibilidad de configuración OAuth por plataforma (sin secretos)."""
+
+    platform: AccountPlatform
+    configured: bool
+    missing: list[str] = Field(default_factory=list)
+
+
+class AccountsOAuthConfigOut(BaseModel):
+    """Estado de configuración OAuth para todas las plataformas."""
+
+    platforms: list[PlatformOAuthConfigOut]
+
+
+class InstagramCandidateOut(BaseModel):
+    """Cuenta Business/Creator de Instagram elegible tras autorizar Meta."""
+
+    external_account_id: str
+    username: str
+    display_name: str
+    avatar_url: str | None = None
+    page_name: str
+
+
+class InstagramSelectionOut(BaseModel):
+    """Lista temporal de cuentas elegibles de Instagram (`GET .../pending/{token}`)."""
+
+    selection_token: str
+    candidates: list[InstagramCandidateOut]
+
+
+class InstagramSelectRequest(BaseModel):
+    """Confirmación de cuentas Business/Creator de Instagram a registrar."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    selection_token: str = Field(min_length=1)
+    external_account_ids: list[str] = Field(min_length=1)
+
+
+class BrowserLoginStartRequest(BaseModel):
+    """Inicio o reconexión de login interactivo con navegador persistente."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    platform: Literal["tiktok", "instagram"]
+    account_id: str | None = None
+    alias: str | None = Field(default=None, max_length=120)
+
+
+class BrowserLoginOut(BaseModel):
+    """Estado en vivo de una sesión de login con navegador."""
+
+    account_id: str
+    platform: AccountPlatform
+    session_status: BrowserLoginSessionStatus
+    error: str | None = None
+
+
+class TokenImportRequest(BaseModel):
+    """Importación de uno o varios tokens locales existentes en modo solo lectura."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1, max_length=1000)
+    platform: AccountPlatform | None = None
+    alias: str | None = Field(default=None, max_length=120)
