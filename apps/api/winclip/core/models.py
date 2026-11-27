@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Column, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
 from sqlalchemy.types import JSON
 from sqlmodel import Field, SQLModel, UTCDateTime
 
@@ -43,6 +43,20 @@ class Workspace(SQLModel, table=True):
     created_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
 
 
+class Campaign(SQLModel, table=True):
+    """Campaña de clipping con reglas editoriales y visuales (`docs/architecture.md §7`)."""
+
+    __tablename__ = "campaign"
+
+    id: str = Field(primary_key=True)
+    workspace_id: str = Field(foreign_key="workspace.id", index=True)
+    name: str = Field(max_length=120)
+    rules_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    source_text: str | None = None
+    created_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
+    updated_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
+
+
 class Project(SQLModel, table=True):
     """Proyecto de clipping: un video fuente y sus clips."""
 
@@ -50,8 +64,15 @@ class Project(SQLModel, table=True):
 
     id: str = Field(primary_key=True)
     workspace_id: str = Field(foreign_key="workspace.id", index=True)
-    # Sin FK todavía: la tabla `campaign` llega en el change 6.
-    campaign_id: str | None = Field(default=None, max_length=64)
+    campaign_id: str | None = Field(
+        default=None,
+        sa_column=Column(
+            String(64),
+            ForeignKey("campaign.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
     source_type: str = Field(default="file", max_length=16)
     source_url: str | None = None
     title: str = Field(default="", max_length=500)

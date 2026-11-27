@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from winclip import __version__
 from winclip.core.config import Settings, get_settings
 from winclip.core.db import init_db
-from winclip.routers import clips, events, health, jobs, presets, projects
+from winclip.routers import campaigns, clips, events, health, jobs, presets, projects
 from winclip.services.events import EventBroadcaster
 
 
@@ -56,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router, prefix="/api")
     app.include_router(projects.router)
     app.include_router(clips.router)
+    app.include_router(campaigns.router)
     app.include_router(jobs.router)
     app.include_router(presets.router)
     app.include_router(events.router)

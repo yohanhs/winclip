@@ -15,12 +15,13 @@ from sqlmodel import Session, select
 
 from winclip.core.db import ensure_default_workspace
 from winclip.core.ids import new_project_id
-from winclip.core.models import Clip, Job, JobEvent, Project, utcnow
+from winclip.core.models import Campaign, Clip, Job, JobEvent, Project, utcnow
 from winclip.core.storage import LocalStorage, StoragePathError
 from winclip.pipeline.subtitles.presets import SubtitlePresetError, load_preset
 from winclip.routers.deps import EngineDep, SessionDep, SettingsDep
 from winclip.routers.schemas import ClipOut, JobOut, ProjectCreate, ProjectCreated, ProjectOut
 from winclip.routers.serializers import clip_out, project_out
+from winclip.rules.schema import CampaignRules
 from winclip.services.uploads import UploadError, stream_multipart
 from winclip.worker import queue
 
@@ -212,7 +213,32 @@ async def create_project(
         )
     if payload.source_url:
         _validate_url(payload.source_url)
-    preset = _validate_preset(payload.subtitle_preset)
+
+    campaign: Campaign | None = None
+    campaign_rules: CampaignRules | None = None
+    if payload.campaign_id:
+        campaign = session.get(Campaign, payload.campaign_id)
+        if campaign is None:
+            if file_path is not None:
+                shutil.rmtree(project_dir, ignore_errors=True)
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"no existe la campaña {payload.campaign_id}",
+            )
+        campaign_rules = CampaignRules.model_validate(campaign.rules_json)
+
+    requested_clips = payload.requested_clips
+    language = payload.language
+    subtitle_preset_raw = payload.subtitle_preset
+    if campaign_rules is not None:
+        if "requested_clips" not in payload.model_fields_set and campaign_rules.max_clips:
+            requested_clips = campaign_rules.max_clips
+        if "language" not in payload.model_fields_set and campaign_rules.language:
+            language = campaign_rules.language
+        if "subtitle_preset" not in payload.model_fields_set and campaign_rules.subtitle_preset:
+            subtitle_preset_raw = campaign_rules.subtitle_preset
+
+    preset = _validate_preset(subtitle_preset_raw)
 
     title = (payload.title or "").strip()
     if not title:
@@ -222,15 +248,13 @@ async def create_project(
     project = Project(
         id=project_id,
         workspace_id=workspace.id,
-        campaign_id=payload.campaign_id,
+        campaign_id=campaign.id if campaign is not None else None,
         source_type=payload.source_type,
         source_url=payload.source_url,
         title=title,
         status="queued",
-        requested_clips=(
-            payload.requested_clips if isinstance(payload.requested_clips, int) else None
-        ),
-        language=payload.language,
+        requested_clips=(requested_clips if isinstance(requested_clips, int) else None),
+        language=language,
         subtitle_preset=preset,
         reframe_mode=payload.reframe_mode,
         source_path=_relative(storage, file_path) if file_path is not None else None,
@@ -246,10 +270,11 @@ async def create_project(
         job_type="pipeline",
         project_id=project.id,
         payload={
-            "requested_clips": payload.requested_clips,
-            "language": payload.language,
+            "requested_clips": requested_clips,
+            "language": language,
             "subtitle_preset": preset,
             "reframe_mode": payload.reframe_mode,
+            "campaign_id": project.campaign_id,
         },
         max_attempts=settings.job_max_attempts,
     )

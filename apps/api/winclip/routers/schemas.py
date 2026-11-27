@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from winclip.pipeline.render_models import ReframeMode
 from winclip.pipeline.subtitles.presets import SubtitlePreset
+from winclip.rules.schema import CampaignRules, RuleViolation, TemplateLanguage
 
 Language = Literal["auto", "es", "en"]
 RequestedClips = int | Literal["max"]
@@ -97,6 +98,7 @@ class ProjectOut(BaseModel):
     id: str
     workspace_id: str
     campaign_id: str | None = None
+    campaign_name: str | None = None
     source_type: str
     source_url: str | None = None
     title: str
@@ -143,6 +145,7 @@ class ClipOut(BaseModel):
     duration: float
     video_url: str | None = None
     thumb_url: str | None = None
+    rule_violations: list[RuleViolation] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -188,3 +191,90 @@ class SubtitlePresetOut(BaseModel):
     @classmethod
     def from_preset(cls, preset_id: str, preset: SubtitlePreset) -> SubtitlePresetOut:
         return cls(id=preset_id, **preset.model_dump())
+
+
+# --------------------------------------------------------------------------- campañas
+
+
+class CampaignCreate(BaseModel):
+    """Cuerpo de `POST /api/campaigns`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    rules: CampaignRules
+    source_text: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _clean_name(cls, value: str) -> str:
+        cleaned = " ".join(value.split())
+        if not cleaned:
+            raise ValueError("name no puede estar vacío")
+        return cleaned
+
+
+class CampaignUpdate(BaseModel):
+    """Actualización parcial de `PATCH /api/campaigns/{id}`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    rules: CampaignRules | None = None
+    source_text: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _clean_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = " ".join(value.split())
+        if not cleaned:
+            raise ValueError("name no puede estar vacío")
+        return cleaned
+
+
+class CampaignOut(BaseModel):
+    """Campaña persistida con sus reglas estructuradas."""
+
+    id: str
+    workspace_id: str
+    name: str
+    rules: CampaignRules
+    source_text: str | None = None
+    projects_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class CampaignTemplateOut(BaseModel):
+    """Plantilla predefinida de campaña ES/EN."""
+
+    id: str
+    title: str
+    description: str
+    language: TemplateLanguage
+    rules: CampaignRules
+
+
+class CampaignParseRequest(BaseModel):
+    """Cuerpo de `POST /api/campaigns/parse`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_text: str = Field(min_length=1, max_length=20000)
+
+
+class CampaignParseOut(BaseModel):
+    """Propuesta generada desde un brief en texto libre (sin persistir)."""
+
+    rules: CampaignRules
+    inferred_fields: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    provider: str
+
+
+class WatermarkUploadOut(BaseModel):
+    """Respuesta de `POST /api/campaigns/watermarks`."""
+
+    watermark_path: str

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from winclip.core.models import Clip, Job, Project
-from winclip.routers.schemas import ClipOut, JobOut, JobSummary, ProjectOut
+from winclip.core.models import Campaign, Clip, Job, Project
+from winclip.routers.schemas import CampaignOut, ClipOut, JobOut, JobSummary, ProjectOut
+from winclip.rules.schema import CampaignRules, RuleViolation
 
 ACTIVE_JOB_STATUSES = ("queued", "running")
 
@@ -20,6 +21,16 @@ def job_summary(job: Job) -> JobSummary:
 
 def clip_out(clip: Clip) -> ClipOut:
     rendered = clip.status == "rendered" and bool(clip.path)
+    raw_violations = (clip.candidate or {}).get("rule_violations") or []
+    violations: list[RuleViolation] = []
+    for item in raw_violations:
+        if isinstance(item, RuleViolation):
+            violations.append(item)
+        elif isinstance(item, dict):
+            try:
+                violations.append(RuleViolation.model_validate(item))
+            except ValueError:
+                continue
     return ClipOut(
         **{
             field: getattr(clip, field)
@@ -41,6 +52,24 @@ def clip_out(clip: Clip) -> ClipOut:
         },
         video_url=f"/api/clips/{clip.id}/file" if rendered else None,
         thumb_url=f"/api/clips/{clip.id}/thumb" if rendered and clip.thumb_path else None,
+        rule_violations=violations,
+    )
+
+
+def campaign_out(session: Session, campaign: Campaign) -> CampaignOut:
+    projects_count = len(
+        session.exec(select(Project.id).where(Project.campaign_id == campaign.id)).all()
+    )
+    rules = CampaignRules.model_validate(campaign.rules_json)
+    return CampaignOut(
+        id=campaign.id,
+        workspace_id=campaign.workspace_id,
+        name=campaign.name,
+        rules=rules,
+        source_text=campaign.source_text,
+        projects_count=projects_count,
+        created_at=campaign.created_at,
+        updated_at=campaign.updated_at,
     )
 
 
@@ -73,6 +102,11 @@ def project_out(
         ),
         None,
     )
+    campaign_name: str | None = None
+    if project.campaign_id:
+        campaign = session.get(Campaign, project.campaign_id)
+        if campaign is not None:
+            campaign_name = campaign.name
     return ProjectOut(
         **{
             field: getattr(project, field)
@@ -93,6 +127,7 @@ def project_out(
                 "updated_at",
             )
         },
+        campaign_name=campaign_name,
         clips_count=len(clips),
         thumb_url=thumb,
         active_job=job_summary(active) if active is not None else None,

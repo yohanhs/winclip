@@ -12,11 +12,13 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
 from sqlmodel import Session
 
-from winclip.core.models import Clip, Project, utcnow
+from winclip.core.models import Campaign, Clip, Project, utcnow
 from winclip.core.storage import LocalStorage, StoragePathError
 from winclip.routers.deps import EngineDep, SessionDep, SettingsDep
 from winclip.routers.schemas import ClipOut, ClipUpdate, JobOut
 from winclip.routers.serializers import clip_out
+from winclip.rules.schema import CampaignRules, RuleViolation
+from winclip.rules.validator import validate_candidate
 from winclip.worker import queue
 
 router = APIRouter(prefix="/api/clips", tags=["clips"])
@@ -213,6 +215,27 @@ def update_clip(clip_id: str, payload: ClipUpdate, session: SessionDep) -> ClipO
             "hashtags": list(clip.hashtags),
         }
     )
+    project = session.get(Project, clip.project_id)
+    if project is not None and project.campaign_id:
+        campaign = session.get(Campaign, project.campaign_id)
+        if campaign is not None:
+            rules = CampaignRules.model_validate(campaign.rules_json)
+            existing_semantic = [
+                RuleViolation.model_validate(item)
+                for item in (candidate.get("rule_violations") or [])
+                if isinstance(item, dict) and item.get("code") == "banned_topic_risk"
+            ]
+            violations = validate_candidate(
+                start=clip.start_sec,
+                end=clip.end_sec,
+                rules=rules,
+                title=clip.title,
+                hook=clip.hook,
+                description=clip.description,
+                hashtags=clip.hashtags,
+                existing_violations=existing_semantic,
+            )
+            candidate["rule_violations"] = [v.model_dump(mode="json") for v in violations]
     clip.candidate = candidate
     clip.updated_at = utcnow()
     session.add(clip)
