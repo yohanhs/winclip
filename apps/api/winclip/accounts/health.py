@@ -267,9 +267,15 @@ def _fetch_profile(
         return str(channel.get("id") or "") or None, snippet.get("title"), handle or None, avatar
 
     if platform == "tiktok":
+        raw_scopes = creds.get("scopes") or []
+        fields = (
+            "open_id,display_name,avatar_url,username"
+            if "user.info.profile" in raw_scopes
+            else "open_id,display_name,avatar_url"
+        )
         resp = client.get(
             TIKTOK_USER_INFO_URL,
-            params={"fields": "open_id,display_name,avatar_url,username"},
+            params={"fields": fields},
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=20.0,
         )

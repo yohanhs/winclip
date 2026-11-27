@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from winclip.core.config import ROOT_DIR
 
 PRESETS_DIRNAME = "assets/subtitle-presets"
+NO_SUBTITLES_PRESET = "none"
 SAFE_ZONE_MIN = 0.62
 SAFE_ZONE_MAX = 0.70
 _COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
@@ -78,7 +79,12 @@ def list_presets(directory: Path | None = None) -> list[str]:
 def available_presets(directory: Path | None = None) -> str:
     """Lista legible para los mensajes de error de la CLI."""
     names = list_presets(directory)
-    return ", ".join(names) if names else "(ninguno)"
+    return ", ".join([*names, NO_SUBTITLES_PRESET]) if names else NO_SUBTITLES_PRESET
+
+
+def is_valid_preset_name(name: str, *, directory: Path | None = None) -> bool:
+    """True si `name` es `none` (sin subtítulos) o un preset JSON existente."""
+    return name == NO_SUBTITLES_PRESET or name in list_presets(directory)
 
 
 def load_preset(name: str, *, directory: Path | None = None) -> SubtitlePreset:

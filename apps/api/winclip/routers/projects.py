@@ -17,7 +17,11 @@ from winclip.core.db import ensure_default_workspace
 from winclip.core.ids import new_project_id
 from winclip.core.models import Campaign, Clip, Job, JobEvent, Project, utcnow
 from winclip.core.storage import LocalStorage, StoragePathError
-from winclip.pipeline.subtitles.presets import SubtitlePresetError, load_preset
+from winclip.pipeline.subtitles.presets import (
+    NO_SUBTITLES_PRESET,
+    SubtitlePresetError,
+    load_preset,
+)
 from winclip.routers.deps import EngineDep, SessionDep, SettingsDep
 from winclip.routers.schemas import ClipOut, JobOut, ProjectCreate, ProjectCreated, ProjectOut
 from winclip.routers.serializers import clip_out, project_out
@@ -83,6 +87,8 @@ def _relative(storage: LocalStorage, path: Path) -> str:
 
 
 def _validate_preset(name: str) -> str:
+    if name == NO_SUBTITLES_PRESET:
+        return name
     try:
         load_preset(name)
     except SubtitlePresetError as exc:

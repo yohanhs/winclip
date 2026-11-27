@@ -724,6 +724,9 @@ export function CampaignEditor({
                 <option value="" className="bg-[#111114]">
                   Sin preset forzado
                 </option>
+                <option value="none" className="bg-[#111114]">
+                  Sin subtítulos (desactivados)
+                </option>
                 {presets.map((preset) => (
                   <option
                     key={preset.id}

@@ -73,7 +73,7 @@ export function CropControls({
             Preset de subtítulos
           </Label>
           <span className="font-mono text-[11px] text-zinc-500">
-            Proyecto: {projectPreset}
+            Proyecto: {projectPreset === "none" ? "Sin subtítulos" : projectPreset}
           </span>
         </div>
         <select
@@ -87,7 +87,10 @@ export function CropControls({
           }}
           className="h-9 w-full rounded-md border border-white/10 bg-[#0D0D10] px-3 text-xs text-zinc-100 outline-none focus:border-amber-400/60 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <option value="">Heredar del proyecto ({projectPreset})</option>
+          <option value="">
+            Heredar del proyecto ({projectPreset === "none" ? "Sin subtítulos" : projectPreset})
+          </option>
+          <option value="none">Sin subtítulos (desactivados)</option>
           {presets.map((preset) => (
             <option key={preset.id} value={preset.id}>
               {preset.name} ({preset.id})

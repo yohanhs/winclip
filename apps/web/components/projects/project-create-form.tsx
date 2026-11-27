@@ -44,7 +44,7 @@ type SourceType = "url" | "file";
 type Language = "auto" | "es" | "en";
 type ReframeMode = "face" | "center" | "blur" | "passthrough";
 
-const PRESET_IDS = ["bold-yellow", "hormozi", "clean-white", "mrbeast"] as const;
+const PRESET_IDS = ["bold-yellow", "hormozi", "clean-white", "mrbeast", "none"] as const;
 
 const REFRAME_OPTIONS: Array<{
   id: ReframeMode;

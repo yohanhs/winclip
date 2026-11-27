@@ -43,7 +43,11 @@ interface AccountCardProps {
 }
 
 function initialsFor(label: string): string {
-  const parts = label.trim().split(/\s+/).filter(Boolean);
+  const parts = label
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.replace(/^[^A-Za-z0-9À-ÿ]+/, ""))
+    .filter(Boolean);
   if (parts.length === 0) return "WC";
   return parts
     .map((word) => word[0] ?? "")

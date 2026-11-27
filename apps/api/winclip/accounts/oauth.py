@@ -620,9 +620,14 @@ def _complete_tiktok_oauth(
     handle = ""
     avatar_url: str | None = None
 
+    tiktok_fields = (
+        "open_id,display_name,avatar_url,username"
+        if "user.info.profile" in granted_scopes
+        else "open_id,display_name,avatar_url"
+    )
     user_resp = client.get(
         TIKTOK_USER_INFO_URL,
-        params={"fields": "open_id,display_name,avatar_url,username"},
+        params={"fields": tiktok_fields},
         headers={"Authorization": f"Bearer {access_token}"},
         timeout=20.0,
     )

@@ -177,6 +177,8 @@ class BrowserLoginManager:
                     ) and not is_login_url(current_url, login_session.platform)
 
                     if login_session.confirm_event.is_set() or auto_detected:
+                        if context_factory is None:
+                            time.sleep(1.5)
                         display_name, handle = extract_profile_hint(page, login_session.platform)
                         login_session.display_name = display_name
                         login_session.handle = handle

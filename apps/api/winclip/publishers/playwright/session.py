@@ -34,7 +34,7 @@ PLATFORM_BROWSER_CONFIGS: dict[str, PlatformBrowserConfig] = {
         check_url="https://www.instagram.com/",
         session_cookies=("sessionid", "ds_user_id"),
         domain_substring="instagram.com",
-        login_path_markers=("/accounts/login", "/challenge"),
+        login_path_markers=("/accounts/login", "/accounts/onetap", "/challenge"),
     ),
 }
 
@@ -102,8 +102,12 @@ def open_persistent_context(
 
     profile_dir.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as pw:
+        # `channel="chromium"` garantiza usar siempre Chrome for Testing (tanto
+        # con ventana como en `--headless=new`) en lugar de `chromium_headless_shell`,
+        # que en macOS usa otra clave OSCrypt y purga las cookies del perfil al abrirlo.
         context = pw.chromium.launch_persistent_context(
             user_data_dir=str(profile_dir),
+            channel="chromium",
             headless=headless,
             viewport={"width": 1280, "height": 840},
         )

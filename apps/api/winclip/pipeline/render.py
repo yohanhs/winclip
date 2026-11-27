@@ -61,7 +61,7 @@ from winclip.pipeline.subtitles.fonts import (
 )
 from winclip.pipeline.subtitles.layout import build_cues, retime_words
 from winclip.pipeline.subtitles.pil_engine import SubtitleFrameRenderer
-from winclip.pipeline.subtitles.presets import SubtitlePreset, load_preset
+from winclip.pipeline.subtitles.presets import NO_SUBTITLES_PRESET, SubtitlePreset, load_preset
 from winclip.rules.schema import CampaignRules, validate_watermark_path
 
 HOOK_CARD_FILENAME = "hook.png"
@@ -378,7 +378,7 @@ def build_filter_graph(
     *,
     fps: float,
     engine: str,
-    subtitles_path: Path,
+    subtitles_path: Path | None,
     fonts_dir: Path,
     hook_input: int | None,
     hook_seconds: float,
@@ -417,12 +417,13 @@ def build_filter_graph(
         parts.append(f"{current}[ctacard]overlay=0:0:enable='gte(t,{cta_start:.3f})'[vcta]")
         current = "[vcta]"
 
-    if engine == "ass":
-        parts.append(f"{current}ass=filename='{subtitles_path}':fontsdir='{fonts_dir}'[vsub]")
-    else:
-        parts.append(f"[{overlay_input}:v]format=rgba[subs]")
-        parts.append(f"{current}[subs]overlay=0:0:format=auto[vsub]")
-    current = "[vsub]"
+    if subtitles_path is not None:
+        if engine == "ass":
+            parts.append(f"{current}ass=filename='{subtitles_path}':fontsdir='{fonts_dir}'[vsub]")
+        else:
+            parts.append(f"[{overlay_input}:v]format=rgba[subs]")
+            parts.append(f"{current}[subs]overlay=0:0:format=auto[vsub]")
+        current = "[vsub]"
 
     parts.append(f"{current}fps={fps:g},format=yuv420p[vout]")
     if has_audio:
@@ -571,7 +572,7 @@ def compute_fingerprint(
     candidate: Any,
     *,
     options: RenderOptions,
-    preset: SubtitlePreset,
+    preset: SubtitlePreset | None,
     font: ResolvedFont,
     fps: float,
 ) -> str:
@@ -611,7 +612,7 @@ def compute_fingerprint(
             "cta_text": options.cta_text,
             "cta_seconds": options.cta_seconds,
         },
-        "preset": preset.model_dump(mode="json"),
+        "preset": preset.model_dump(mode="json") if preset is not None else None,
         "fps": fps,
     }
     encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
@@ -863,10 +864,11 @@ def render_clip(
     source = find_source_video(storage, project_id)
     probe = probe_media(source, settings)
     fps = output_fps(probe.fps)
-    preset = load_preset(options.preset)
+    subtitles_enabled = options.preset != NO_SUBTITLES_PRESET
+    preset = load_preset(options.preset) if subtitles_enabled else None
     font = resolve_font(
-        options.font or preset.font,
-        fallback=preset.fallback_font,
+        options.font or (preset.font if preset is not None else "Montserrat"),
+        fallback=preset.fallback_font if preset is not None else "DejaVu Sans",
         settings=settings,
     )
 
@@ -918,44 +920,51 @@ def render_clip(
         )
         reporter.emit("reframe", PROGRESS_REFRAME_END, f"modo {reframe_result.mode}")
 
-        reporter.emit("subtitles", PROGRESS_REFRAME_END + 1, "generando subtítulos")
-        words = retime_words(
-            transcript,
-            candidate.start,
-            candidate.end,
-            uppercase=preset.uppercase,
-            word_overrides=options.word_overrides or None,
-        )
-        measure = measure_font(font.font.path, preset.font_size)
-        cues = build_cues(words, preset, measure=measure)
-        write_ass(
-            tmp_dir / SUBTITLES_FILENAME,
-            cues,
-            preset,
-            font_name=font.ass_name,
-            measure=measure,
-        )
         font_files = [font.font]
-        if any(contains_emoji(word.text) for word in words):
-            emoji = resolve_font(
-                "Noto Color Emoji",
-                fallback=preset.fallback_font,
-                settings=settings,
-            )
-            if not emoji.fallback_used:
-                font_files.append(emoji.font)
         overlay_frames: Iterable[np.ndarray] | None = None
-        if options.engine == "pil":
-            overlay_frames = SubtitleFrameRenderer(cues, preset, font.font.path).iter_frames(
-                duration, fps
+        if subtitles_enabled and preset is not None:
+            reporter.emit("subtitles", PROGRESS_REFRAME_END + 1, "generando subtítulos")
+            words = retime_words(
+                transcript,
+                candidate.start,
+                candidate.end,
+                uppercase=preset.uppercase,
+                word_overrides=options.word_overrides or None,
             )
-        reporter.emit("subtitles", PROGRESS_SUBTITLES_END, f"{len(cues)} bloques")
+            measure = measure_font(font.font.path, preset.font_size)
+            cues = build_cues(words, preset, measure=measure)
+            write_ass(
+                tmp_dir / SUBTITLES_FILENAME,
+                cues,
+                preset,
+                font_name=font.ass_name,
+                measure=measure,
+            )
+            if any(contains_emoji(word.text) for word in words):
+                emoji = resolve_font(
+                    "Noto Color Emoji",
+                    fallback=preset.fallback_font,
+                    settings=settings,
+                )
+                if not emoji.fallback_used:
+                    font_files.append(emoji.font)
+            if options.engine == "pil":
+                overlay_frames = SubtitleFrameRenderer(cues, preset, font.font.path).iter_frames(
+                    duration, fps
+                )
+            reporter.emit("subtitles", PROGRESS_SUBTITLES_END, f"{len(cues)} bloques")
+        else:
+            (tmp_dir / SUBTITLES_FILENAME).write_text(
+                "; subtítulos desactivados (preset=none)\n", encoding="utf-8"
+            )
+            reporter.emit("subtitles", PROGRESS_SUBTITLES_END, "sin subtítulos")
 
         hook_active = options.hook_overlay and bool(candidate.hook.strip())
         cta_active = bool((options.cta_text or "").strip())
         cta_start = max(0.0, round(duration - options.cta_seconds, 3))
         encoder = detect_video_encoder(settings)
-        subtitles_path = tmp_dir / SUBTITLES_FILENAME
+        subtitles_path = (tmp_dir / SUBTITLES_FILENAME) if subtitles_enabled else None
+        card_font_size = max(40, (preset.font_size if preset is not None else 64) - 6)
         with tempfile.TemporaryDirectory(prefix="winclip-render-") as work_raw:
             work = Path(work_raw)
             hook_card: Path | None = None
@@ -964,7 +973,7 @@ def render_clip(
                     candidate.hook,
                     work / HOOK_CARD_FILENAME,
                     font_path=font.font.path,
-                    font_size=max(40, preset.font_size - 6),
+                    font_size=card_font_size,
                 )
             cta_card: Path | None = None
             if cta_active and options.cta_text:
@@ -972,11 +981,11 @@ def render_clip(
                     options.cta_text,
                     work / CTA_CARD_FILENAME,
                     font_path=font.font.path,
-                    font_size=max(40, preset.font_size - 6),
+                    font_size=card_font_size,
                 )
             with fonts_directory(font_files) as fonts_dir:
                 filter_script = work / "filter_complex.txt"
-                overlay = options.engine == "pil"
+                overlay = subtitles_enabled and options.engine == "pil"
                 next_index = 1
                 hook_index: int | None = None
                 watermark_index: int | None = None
@@ -1056,7 +1065,7 @@ def render_clip(
             reframe=reframe_result.manifest_spec(),
             subtitles=SubtitleSummary(
                 engine=options.engine,
-                preset=preset.name,
+                preset=preset.name if preset is not None else NO_SUBTITLES_PRESET,
                 font=font.name,
             ),
             hook_overlay=hook_active,

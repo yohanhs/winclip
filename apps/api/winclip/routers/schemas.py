@@ -8,7 +8,11 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from winclip.pipeline.render_models import ReframeMode
-from winclip.pipeline.subtitles.presets import SubtitlePreset, available_presets, list_presets
+from winclip.pipeline.subtitles.presets import (
+    SubtitlePreset,
+    available_presets,
+    is_valid_preset_name,
+)
 from winclip.publishers.base import DeliveryMode, PublishMeta
 from winclip.rules.schema import CampaignRules, RuleViolation, TemplateLanguage
 
@@ -199,7 +203,7 @@ class ClipUpdate(BaseModel):
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("subtitle_preset no puede estar vacío")
-        if cleaned not in list_presets():
+        if not is_valid_preset_name(cleaned):
             raise ValueError(
                 f"subtitle_preset desconocido: {cleaned!r}; disponibles: {available_presets()}"
             )

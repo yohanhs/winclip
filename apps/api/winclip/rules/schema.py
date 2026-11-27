@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from winclip.core.config import ROOT_DIR
-from winclip.pipeline.subtitles.presets import available_presets, list_presets
+from winclip.pipeline.subtitles.presets import available_presets, is_valid_preset_name
 
 RuleLanguage = Literal["es", "en", "auto"]
 RuleTargetPlatform = Literal["youtube", "tiktok", "instagram"]
@@ -155,8 +155,7 @@ class CampaignRules(BaseModel):
         cleaned = value.strip()
         if not cleaned:
             return None
-        presets = list_presets()
-        if cleaned not in presets:
+        if not is_valid_preset_name(cleaned):
             raise ValueError(
                 f"subtitle_preset desconocido: {cleaned!r}; disponibles: {available_presets()}"
             )

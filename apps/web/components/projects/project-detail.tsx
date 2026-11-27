@@ -151,7 +151,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
               </span>
               <span>{formatDuration(project.duration)}</span>
               <span>{project.clips_count} clips</span>
-              <span className="font-mono uppercase">{project.subtitle_preset}</span>
+              <span className="font-mono uppercase">
+                {project.subtitle_preset === "none"
+                  ? "Sin subtítulos"
+                  : project.subtitle_preset}
+              </span>
               {project.campaign_name ? (
                 <Link
                   href="/campaigns"

@@ -76,6 +76,14 @@ export const PRESET_STYLES: Record<string, PresetStyle> = {
     activeClassName: "text-[#FACC15]",
     uppercase: true,
   },
+  none: {
+    name: "Sin subtítulos",
+    subtitle: "Vídeo limpio · sin subtítulos quemados",
+    swatch: "#71717A",
+    lines: [],
+    captionClassName: "",
+    activeClassName: "",
+  },
 };
 
 
@@ -120,7 +128,7 @@ export function SubtitlePresetPreview({
   const [wordIndex, setWordIndex] = useState(1);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || style.lines.length === 0) return;
     const timer = window.setInterval(() => {
       setWordIndex((current) => {
         const line = style.lines[lineIndex] ?? [];
@@ -204,47 +212,49 @@ export function SubtitlePresetPreview({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 border-t border-dashed border-white/10" />
 
           {/* Subtítulos */}
-          <div className="absolute inset-x-0 bottom-[19%] z-20 flex flex-col items-center gap-0.5 px-4 text-center">
-            {lines.map((line, index) => (
-              <p
-                key={`${line}-${index}`}
-                className={cn(
-                  "max-w-full text-balance font-extrabold leading-tight",
-                  preset === "mrbeast" || preset === "hormozi"
-                    ? "caption-stroke-heavy"
-                    : "caption-stroke",
-                  style.boxed && "rounded bg-black/55 px-1.5 py-0.5",
-                  style.captionClassName,
-                )}
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: preset === "mrbeast" ? "1.35rem" : "1.05rem",
-                  WebkitTextStroke:
-                    preset === "mrbeast" ? "1px rgba(0,0,0,0.9)" : undefined,
-                }}
-              >
-                {line.split(" ").map((word, wordPosition) => (
-                  <span
-                    key={`${word}-${wordPosition}`}
-                    className={cn(
-                      "transition-colors duration-150",
-                      lineIndex >= 0 &&
-                        wordPosition === wordIndex &&
-                        style.activeClassName,
-                    )}
-                    style={
-                      wordPosition === wordIndex
-                        ? { color: highlight }
-                        : undefined
-                    }
-                  >
-                    {word}
-                    {wordPosition < line.split(" ").length - 1 ? " " : ""}
-                  </span>
-                ))}
-              </p>
-            ))}
-          </div>
+          {preset !== "none" ? (
+            <div className="absolute inset-x-0 bottom-[19%] z-20 flex flex-col items-center gap-0.5 px-4 text-center">
+              {lines.map((line, index) => (
+                <p
+                  key={`${line}-${index}`}
+                  className={cn(
+                    "max-w-full text-balance font-extrabold leading-tight",
+                    preset === "mrbeast" || preset === "hormozi"
+                      ? "caption-stroke-heavy"
+                      : "caption-stroke",
+                    style.boxed && "rounded bg-black/55 px-1.5 py-0.5",
+                    style.captionClassName,
+                  )}
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: preset === "mrbeast" ? "1.35rem" : "1.05rem",
+                    WebkitTextStroke:
+                      preset === "mrbeast" ? "1px rgba(0,0,0,0.9)" : undefined,
+                  }}
+                >
+                  {line.split(" ").map((word, wordPosition) => (
+                    <span
+                      key={`${word}-${wordPosition}`}
+                      className={cn(
+                        "transition-colors duration-150",
+                        lineIndex >= 0 &&
+                          wordPosition === wordIndex &&
+                          style.activeClassName,
+                      )}
+                      style={
+                        wordPosition === wordIndex
+                          ? { color: highlight }
+                          : undefined
+                      }
+                    >
+                      {word}
+                      {wordPosition < line.split(" ").length - 1 ? " " : ""}
+                    </span>
+                  ))}
+                </p>
+              ))}
+            </div>
+          ) : null}
 
           {/* Barra de reproducción */}
           <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-2">
