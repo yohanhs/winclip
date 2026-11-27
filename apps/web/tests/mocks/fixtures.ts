@@ -3,6 +3,8 @@ import type {
   CampaignRules,
   CampaignTemplateOut,
   ClipOut,
+  ClipWordOut,
+  ClipWordsOut,
   JobSummary,
   ProjectOut,
   PublicationOut,
@@ -65,9 +67,53 @@ export function makeClip(overrides: Partial<ClipOut> = {}): ClipOut {
     video_url: "/api/clips/clip-1/file",
     thumb_url: "/api/clips/clip-1/thumb",
     rule_violations: [],
+    subtitle_preset: null,
+    reframe_mode: null,
+    crop_x_pct: null,
+    crop_y_pct: null,
+    zoom_pct: null,
+    subtitle_overrides: {},
     created_at: "2026-01-01T10:00:00Z",
     updated_at: "2026-01-01T10:05:00Z",
     ...overrides,
+  };
+}
+
+export function makeClipWords(
+  clipId = "clip-1",
+  words?: ClipWordOut[],
+): ClipWordsOut {
+  return {
+    clip_id: clipId,
+    words: words ?? [
+      {
+        key: "10200:10500",
+        index: 0,
+        original: "Hola",
+        text: "Hola",
+        start: 0.2,
+        end: 0.5,
+        edited: false,
+      },
+      {
+        key: "10600:11000",
+        index: 1,
+        original: "Juc",
+        text: "Juc",
+        start: 0.6,
+        end: 1.0,
+        edited: false,
+      },
+      {
+        key: "11100:11500",
+        index: 2,
+        original: "viral",
+        text: "viral",
+        start: 1.1,
+        end: 1.5,
+        edited: false,
+      },
+    ],
   };
 }
 

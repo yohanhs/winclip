@@ -1,9 +1,36 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ClipOut, ClipUpdate, JobOut } from "@winclip/api-client";
+import type {
+  ClipOut,
+  ClipUpdate,
+  ClipWordsOut,
+  JobOut,
+} from "@winclip/api-client";
 
 import { useApiClient } from "./use-api-client";
+
+/** Palabras del tramo de un clip con sus overrides aplicados (`GET /api/clips/{id}/words`). */
+export function useClipWords(
+  clipId: string | null | undefined,
+  options?: { enabled?: boolean },
+) {
+  const api = useApiClient();
+  return useQuery<ClipWordsOut>({
+    queryKey: ["clip-words", clipId],
+    queryFn: async () => {
+      if (!clipId) throw new Error("Falta el id del clip");
+      const { data } = await api.GET("/api/clips/{clip_id}/words", {
+        params: { path: { clip_id: clipId } },
+      });
+      if (!data) {
+        throw new Error("No se pudieron cargar las palabras del clip");
+      }
+      return data;
+    },
+    enabled: Boolean(clipId) && (options?.enabled ?? true),
+  });
+}
 
 /** Clips de un proyecto, ordenados por score por el backend. */
 export function useProjectClips(projectId: string | null | undefined) {
@@ -33,9 +60,10 @@ function useInvalidateClip(projectId: string | null | undefined) {
   };
 }
 
-/** `PATCH /api/clips/{id}`: título, descripción, hashtags y tiempos. */
+/** `PATCH /api/clips/{id}`: título, descripción, hashtags, tiempos y overrides. */
 export function useUpdateClip(projectId: string | null | undefined) {
   const api = useApiClient();
+  const queryClient = useQueryClient();
   const invalidate = useInvalidateClip(projectId);
 
   return useMutation<ClipOut, Error, { clipId: string; data: ClipUpdate }>({
@@ -47,7 +75,10 @@ export function useUpdateClip(projectId: string | null | undefined) {
       if (!response.data) throw new Error("No se pudo actualizar el clip");
       return response.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (_clip, { clipId }) => {
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["clip-words", clipId] });
+    },
   });
 }
 

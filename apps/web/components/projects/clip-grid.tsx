@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDeleteClip } from "@/hooks/use-clips";
 import { downloadClipFile } from "@/lib/download";
 import { errorMessage } from "@/lib/api";
-import type { ClipOut } from "@winclip/api-client";
+import type { ClipOut, ReframeMode } from "@winclip/api-client";
 
 import { PublishDialog } from "@/components/publications/publish-dialog";
 import { ClipCard } from "./clip-card";
@@ -22,6 +22,8 @@ export interface ClipGridProps {
   projectId: string;
   clips: ClipOut[];
   projectDuration?: number | null;
+  projectPreset?: string;
+  projectReframeMode?: ReframeMode;
   isLoading?: boolean;
 }
 
@@ -29,6 +31,8 @@ export function ClipGrid({
   projectId,
   clips,
   projectDuration,
+  projectPreset,
+  projectReframeMode,
   isLoading = false,
 }: ClipGridProps) {
   const [rawSelectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -229,6 +233,8 @@ export function ClipGrid({
           if (!open) setTrimClip(null);
         }}
         maxDuration={maxDuration}
+        projectPreset={projectPreset}
+        projectReframeMode={projectReframeMode}
       />
     </div>
   );

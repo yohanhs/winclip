@@ -130,14 +130,15 @@ test.describe("Detalle de proyecto y revisión de clips (/projects/[id])", () =>
     await page.getByLabel("Entrada (IN · s)").fill("160");
     await expect(page.getByText(/El rango no es válido/i)).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Guardar y re-renderizar" }),
+      page.getByRole("button", { name: "Guardar y Re-renderizar" }),
     ).toBeDisabled();
 
     await page.getByLabel("Entrada (IN · s)").fill("105");
     await page.getByLabel("Salida (OUT · s)").fill("150");
-    await page.getByRole("button", { name: "Guardar y re-renderizar" }).click();
+    await page.getByRole("button", { name: "Guardar y Re-renderizar" }).click();
 
-    await expect(page.getByText("Re-renderizando…")).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(page.getByText("Re-renderizando…", { exact: true })).toBeVisible();
     expect(state.rerenderCalls).toEqual(["clip-live-1"]);
 
     // Al llegar clip.ready se actualiza la card
@@ -184,5 +185,59 @@ test.describe("Detalle de proyecto y revisión de clips (/projects/[id])", () =>
         document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("permite corregir palabras de subtítulos y ajustar estilo/reframe por clip", async ({
+    page,
+  }) => {
+    const state = await setupMockApi(page);
+    await page.goto("/projects/proj-e2e-1");
+
+    await page
+      .getByRole("button", { name: "Recortar El error que te cuesta 500 al mes" })
+      .click();
+
+    // Pestaña Subtítulos: corregir "Juc" -> "Hook"
+    await page.getByRole("tab", { name: /Subtítulos/i }).click();
+    await page.getByRole("button", { name: "Juc" }).click();
+    const wordInput = page.getByLabel("Editar palabra Juc");
+    await wordInput.fill("Hook");
+    await wordInput.press("Enter");
+    await expect(page.getByText("1 editada")).toBeVisible();
+
+    // Pestaña Cámara / Estilo: preset clean-white + modo blur
+    await page.getByRole("tab", { name: /Cámara \/ Estilo/i }).click();
+    await page
+      .getByLabel("Preset de subtítulos")
+      .selectOption("clean-white");
+    await page.getByRole("button", { name: /Blur/i }).click();
+
+    await page.getByRole("button", { name: "Guardar y Re-renderizar" }).click();
+
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(page.getByText("Re-renderizando…", { exact: true })).toBeVisible();
+    expect(state.rerenderCalls).toEqual(["clip-e2e-1"]);
+    expect(state.patchPayloads[0]).toMatchObject({
+      clipId: "clip-e2e-1",
+      body: {
+        subtitle_overrides: { "120700:121100": "Hook" },
+        subtitle_preset: "clean-white",
+        reframe_mode: "blur",
+      },
+    });
+
+    // SSE clip.ready actualiza la card
+    const target = state.clipsByProject["proj-e2e-1"]![0]!;
+    target.status = "rendered";
+    target.updated_at = "2026-11-27T08:00:00Z";
+    await emitSseEvent(page, "clip.ready", {
+      project_id: "proj-e2e-1",
+      job_id: "job-rerender-clip-e2e-1",
+      clip_id: "clip-e2e-1",
+      status: "rendered",
+      thumb_url: "/api/clips/clip-e2e-1/thumb",
+      video_url: "/api/clips/clip-e2e-1/file",
+    });
+    await expect(page.getByText("Re-renderizando…")).toBeHidden();
   });
 });

@@ -9,6 +9,7 @@ import type {
   CampaignUpdate,
   ClipOut,
   ClipUpdate,
+  ClipWordOut,
   HealthResponse,
   JobOut,
   PreviewMetaRequest,
@@ -308,6 +309,7 @@ export function createSamplePublication(
 export interface MockApiState {
   projects: ProjectOut[];
   clipsByProject: Record<string, ClipOut[]>;
+  clipWordsByClipId: Record<string, ClipWordOut[]>;
   campaigns: CampaignOut[];
   accounts: SocialAccountOut[];
   publications: PublicationOut[];
@@ -380,6 +382,12 @@ export function createSampleClip(overrides: Partial<ClipOut> = {}): ClipOut {
     video_url: "/api/clips/clip-e2e-1/file",
     thumb_url: "/api/clips/clip-e2e-1/thumb",
     rule_violations: [],
+    subtitle_preset: null,
+    reframe_mode: null,
+    crop_x_pct: null,
+    crop_y_pct: null,
+    zoom_pct: null,
+    subtitle_overrides: {},
     created_at: "2026-11-26T10:04:00Z",
     updated_at: "2026-11-26T10:05:00Z",
     ...overrides,
@@ -422,6 +430,7 @@ export async function setupMockApi(
         }),
       ],
     },
+    clipWordsByClipId: {},
     campaigns: initial?.campaigns ?? [createSampleCampaign()],
     accounts: initial?.accounts ?? [],
     publications: initial?.publications ?? [],
@@ -1187,6 +1196,65 @@ export async function setupMockApi(
       return;
     }
 
+    const clipWordsMatch = pathname.match(/^\/api\/clips\/([^/]+)\/words$/);
+    if (clipWordsMatch && method === "GET") {
+      const clipId = clipWordsMatch[1]!;
+      const clip = Object.values(state.clipsByProject)
+        .flat()
+        .find((item) => item.id === clipId);
+      if (!clip) {
+        await route.fulfill({
+          status: 404,
+          json: { detail: "Clip no encontrado" },
+        });
+        return;
+      }
+      const baseWords: ClipWordOut[] = state.clipWordsByClipId[clipId] ?? [
+        {
+          key: "120200:120600",
+          index: 0,
+          original: "Hola",
+          text: "Hola",
+          start: 0.2,
+          end: 0.6,
+          edited: false,
+        },
+        {
+          key: "120700:121100",
+          index: 1,
+          original: "Juc",
+          text: "Juc",
+          start: 0.7,
+          end: 1.1,
+          edited: false,
+        },
+        {
+          key: "121200:121700",
+          index: 2,
+          original: "viral",
+          text: "viral",
+          start: 1.2,
+          end: 1.7,
+          edited: false,
+        },
+      ];
+      const overrides = clip.subtitle_overrides ?? {};
+      const words = baseWords.map((word) => {
+        const replacement = overrides[word.key];
+        const effective =
+          typeof replacement === "string" && replacement.trim()
+            ? replacement.trim()
+            : word.original;
+        return {
+          ...word,
+          text: effective,
+          edited: effective !== word.original,
+        };
+      });
+      await route.fulfill({ json: { clip_id: clipId, words } });
+      return;
+    }
+
     const clipRerenderMatch = pathname.match(/^\/api\/clips\/([^/]+)\/rerender$/);
     if (clipRerenderMatch && method === "POST") {
       const clipId = clipRerenderMatch[1]!;
@@ -1226,6 +1294,24 @@ export async function setupMockApi(
             if (body.hashtags != null) target.hashtags = body.hashtags;
             if (body.start_sec != null) target.start_sec = body.start_sec;
             if (body.end_sec != null) target.end_sec = body.end_sec;
+            if ("subtitle_preset" in body) {
+              target.subtitle_preset = body.subtitle_preset ?? null;
+            }
+            if ("reframe_mode" in body) {
+              target.reframe_mode = body.reframe_mode ?? null;
+            }
+            if ("crop_x_pct" in body) {
+              target.crop_x_pct = body.crop_x_pct ?? null;
+            }
+            if ("crop_y_pct" in body) {
+              target.crop_y_pct = body.crop_y_pct ?? null;
+            }
+            if ("zoom_pct" in body) {
+              target.zoom_pct = body.zoom_pct ?? null;
+            }
+            if ("subtitle_overrides" in body) {
+              target.subtitle_overrides = body.subtitle_overrides ?? {};
+            }
             target.duration = Math.max(0, target.end_sec - target.start_sec);
             target.updated_at = new Date().toISOString();
             await route.fulfill({ json: target });

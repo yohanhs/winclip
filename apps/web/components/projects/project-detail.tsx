@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { ClipGrid } from "./clip-grid";
 import { PipelineStepper } from "./pipeline-stepper";
 import { StatusBadge } from "./project-card";
+import type { ReframeMode } from "@winclip/api-client";
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const projectQuery = useProject(projectId);
@@ -275,6 +276,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         projectId={project.id}
         clips={visibleClips}
         projectDuration={project.duration}
+        projectPreset={project.subtitle_preset}
+        projectReframeMode={project.reframe_mode as ReframeMode}
         isLoading={clipsQuery.isLoading}
       />
 

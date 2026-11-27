@@ -129,6 +129,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/clips/{clip_id}/words": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Clip Words
+         * @description Devuelve las palabras del tramo del clip con sus overrides aplicados.
+         */
+        get: operations["getClipWords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/clips/{clip_id}": {
         parameters: {
             query?: never;
@@ -148,7 +168,7 @@ export interface paths {
         head?: never;
         /**
          * Update Clip
-         * @description Actualiza metadatos y tiempos (validando `0 <= start < end`).
+         * @description Actualiza metadatos, tiempos y overrides de subtítulos/render.
          */
         patch: operations["updateClip"];
         trace?: never;
@@ -1089,6 +1109,20 @@ export interface components {
             thumb_url?: string | null;
             /** Rule Violations */
             rule_violations?: components["schemas"]["RuleViolation"][];
+            /** Subtitle Preset */
+            subtitle_preset?: string | null;
+            /** Reframe Mode */
+            reframe_mode?: ("face" | "center" | "blur" | "passthrough") | null;
+            /** Crop X Pct */
+            crop_x_pct?: number | null;
+            /** Crop Y Pct */
+            crop_y_pct?: number | null;
+            /** Zoom Pct */
+            zoom_pct?: number | null;
+            /** Subtitle Overrides */
+            subtitle_overrides?: {
+                [key: string]: string;
+            };
             /**
              * Created At
              * Format: date-time
@@ -1115,6 +1149,53 @@ export interface components {
             start_sec?: number | null;
             /** End Sec */
             end_sec?: number | null;
+            /** Subtitle Preset */
+            subtitle_preset?: string | null;
+            /** Reframe Mode */
+            reframe_mode?: ("face" | "center" | "blur" | "passthrough") | null;
+            /** Crop X Pct */
+            crop_x_pct?: number | null;
+            /** Crop Y Pct */
+            crop_y_pct?: number | null;
+            /** Zoom Pct */
+            zoom_pct?: number | null;
+            /** Subtitle Overrides */
+            subtitle_overrides?: {
+                [key: string]: string;
+            } | null;
+        };
+        /**
+         * ClipWordOut
+         * @description Palabra del tramo del clip con su clave estable y texto efectivo.
+         */
+        ClipWordOut: {
+            /** Key */
+            key: string;
+            /** Index */
+            index: number;
+            /** Original */
+            original: string;
+            /** Text */
+            text: string;
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /**
+             * Edited
+             * @default false
+             */
+            edited: boolean;
+        };
+        /**
+         * ClipWordsOut
+         * @description Lista ordenada de palabras de un clip (`GET /api/clips/{id}/words`).
+         */
+        ClipWordsOut: {
+            /** Clip Id */
+            clip_id: string;
+            /** Words */
+            words?: components["schemas"]["ClipWordOut"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2173,6 +2254,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getClipWords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClipWordsOut"];
+                };
             };
             /** @description Validation Error */
             422: {
