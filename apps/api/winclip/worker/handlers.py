@@ -282,8 +282,18 @@ def _build_full_short_fallback(
     elif project.language and project.language != "auto":
         language = project.language
 
+    existing_id: str | None = None
+    selection_path = ctx.storage.selection_path(project.id)
+    if selection_path.is_file():
+        try:
+            prev = CandidatesDocument.model_validate(ctx.storage.read_json(selection_path))
+            if prev.provider == "passthrough:full-video" and prev.candidates:
+                existing_id = prev.candidates[0].id
+        except ValueError:
+            existing_id = None
+
     candidate = ClipCandidate(
-        id=new_ulid(),
+        id=existing_id or new_ulid(),
         start=0.0,
         end=end_sec,
         title=(project.title or "Clip").strip()[:120] or "Clip",
@@ -350,6 +360,11 @@ def _sync_clips(engine: Engine, project_id: str, candidates: list[ClipCandidate]
         by_candidate = {
             str((clip.candidate or {}).get("id")): clip for clip in existing if clip.candidate
         }
+        valid_candidate_ids = {candidate.id for candidate in candidates}
+        for clip in existing:
+            cand_id = str((clip.candidate or {}).get("id") or "")
+            if clip.status == "draft" and cand_id not in valid_candidate_ids:
+                session.delete(clip)
         saved: list[Clip] = []
         for candidate in candidates:
             clip = by_candidate.get(candidate.id)

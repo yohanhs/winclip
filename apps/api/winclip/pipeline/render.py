@@ -867,8 +867,8 @@ def render_clip(
     subtitles_enabled = options.preset != NO_SUBTITLES_PRESET
     preset = load_preset(options.preset) if subtitles_enabled else None
     font = resolve_font(
-        options.font or (preset.font if preset is not None else "Montserrat"),
-        fallback=preset.fallback_font if preset is not None else "DejaVu Sans",
+        options.font or (preset.font if preset is not None else "Montserrat ExtraBold"),
+        fallback=preset.fallback_font if preset is not None else "Montserrat ExtraBold",
         settings=settings,
     )
 
