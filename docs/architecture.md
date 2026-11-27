@@ -30,6 +30,7 @@ flowchart LR
 | 6 | `add-campaign-rules` | `campaign-rules` | 2, 5 |
 | 7 | `add-social-accounts` | `social-accounts` | 4 (UI con 5) |
 | 8 | `add-publishers` | `publishing` | 6, 7 |
+| 9 | `add-clip-editor-controls` | `clip-editor-controls` | 5 |
 
 Los changes 1–3 entregan **solo CLI** (`winclip …`) para validar la calidad del pipeline antes de construir la API y la UI.
 
