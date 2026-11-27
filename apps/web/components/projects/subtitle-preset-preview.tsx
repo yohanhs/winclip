@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bookmark,
   Heart,
@@ -108,15 +108,25 @@ export interface SubtitlePresetPreviewProps {
   preset: string;
   presetData?: SubtitlePreset | null;
   reframeMode?: string;
+  videoSrc?: string | null;
   isPlaying?: boolean;
   onTogglePlay?: (playing: boolean) => void;
   className?: string;
+}
+
+function formatClock(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const whole = Math.floor(seconds);
+  const mins = Math.floor(whole / 60);
+  const secs = whole % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 export function SubtitlePresetPreview({
   preset,
   presetData,
   reframeMode = "face",
+  videoSrc = null,
   isPlaying = true,
   onTogglePlay,
   className,
@@ -126,6 +136,23 @@ export function SubtitlePresetPreview({
   const playing = overridePlaying ?? isPlaying;
   const [lineIndex, setLineIndex] = useState(0);
   const [wordIndex, setWordIndex] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const vid = videoRef.current;
+    const bgVid = bgVideoRef.current;
+    if (!vid) return;
+    if (playing) {
+      void vid.play().catch(() => {});
+      void bgVid?.play().catch(() => {});
+    } else {
+      vid.pause();
+      bgVid?.pause();
+    }
+  }, [playing, videoSrc, reframeMode]);
 
   useEffect(() => {
     if (!playing || style.lines.length === 0) return;
@@ -150,8 +177,51 @@ export function SubtitlePresetPreview({
     <div className={cn("flex flex-col items-center gap-3", className)}>
       <div className="relative w-full max-w-[286px]">
         <div className="relative aspect-[9/16] overflow-hidden rounded-[2rem] border-[5px] border-zinc-800 bg-black shadow-2xl shadow-black/60">
-          {/* Fondo simulado del clip según el modo de encuadre */}
-          {reframeMode === "blur" ? (
+          {/* Fondo real del vídeo local (si se seleccionó archivo) o simulado */}
+          {videoSrc ? (
+            reframeMode === "blur" ? (
+              <>
+                <video
+                  ref={bgVideoRef}
+                  src={videoSrc}
+                  muted
+                  loop
+                  playsInline
+                  autoPlay={playing}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 size-full scale-110 object-cover opacity-70 blur-xl"
+                />
+                <div className="absolute inset-0 flex items-center justify-center px-2">
+                  <video
+                    ref={videoRef}
+                    src={videoSrc}
+                    muted
+                    loop
+                    playsInline
+                    autoPlay={playing}
+                    onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime || 0)}
+                    className="aspect-video w-full rounded-md border border-white/15 object-cover shadow-2xl"
+                  />
+                </div>
+              </>
+            ) : (
+              <video
+                ref={videoRef}
+                src={videoSrc}
+                muted
+                loop
+                playsInline
+                autoPlay={playing}
+                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime || 0)}
+                className={cn(
+                  "absolute inset-0 size-full bg-black",
+                  reframeMode === "passthrough" ? "object-contain" : "object-cover",
+                )}
+              />
+            )
+          ) : reframeMode === "blur" ? (
             <>
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,#52525b_0%,#27272a_48%,#09090b_100%)] blur-xl opacity-75" />
               <div className="absolute inset-0 flex items-center justify-center px-2">
@@ -259,11 +329,23 @@ export function SubtitlePresetPreview({
           {/* Barra de reproducción */}
           <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-2">
             <div className="mb-2 flex items-center gap-2 text-[8px] text-white/70">
-              <span className="font-mono tabular-nums">0:12</span>
+              <span className="font-mono tabular-nums">
+                {videoSrc ? formatClock(currentTime) : "0:12"}
+              </span>
               <div className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/20">
-                <div className="h-full w-1/3 rounded-full bg-white/80" />
+                <div
+                  className="h-full rounded-full bg-white/80"
+                  style={{
+                    width:
+                      videoSrc && duration > 0
+                        ? `${Math.min(100, (currentTime / duration) * 100)}%`
+                        : "33%",
+                  }}
+                />
               </div>
-              <span className="font-mono tabular-nums">0:38</span>
+              <span className="font-mono tabular-nums">
+                {videoSrc && duration > 0 ? formatClock(duration) : "0:38"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="rounded bg-black/50 px-1.5 py-0.5 text-[8px] uppercase tracking-wide text-white/70">

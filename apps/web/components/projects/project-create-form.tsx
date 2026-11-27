@@ -120,6 +120,24 @@ export function ProjectCreateForm() {
   const [urlError, setUrlError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const previewVideoUrl = useMemo(() => {
+    if (sourceType !== "file" || !file || typeof URL === "undefined" || !URL.createObjectURL) {
+      return null;
+    }
+    try {
+      return URL.createObjectURL(file);
+    } catch {
+      return null;
+    }
+  }, [sourceType, file]);
+
+  useEffect(() => {
+    if (!previewVideoUrl) return;
+    return () => {
+      URL.revokeObjectURL(previewVideoUrl);
+    };
+  }, [previewVideoUrl]);
+
   const campaigns = campaignsQuery.data ?? [];
   const selectedCampaign =
     campaigns.find((item) => item.id === campaignId) ?? null;
@@ -546,6 +564,7 @@ export function ProjectCreateForm() {
               preset={preset}
               presetData={selectedPreset?.data ?? null}
               reframeMode={reframeMode}
+              videoSrc={previewVideoUrl}
             />
             <p className="mx-auto max-w-[286px] text-center text-[11px] leading-relaxed text-zinc-600">
               Así se verán los subtítulos y el encuadre en el clip final. Puedes
