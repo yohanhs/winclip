@@ -25,6 +25,9 @@ JOB_STATUSES = ("queued", "running", "done", "failed", "cancelled")
 HEAVY_JOB_TYPES = frozenset({"transcribe", "render"})
 TERMINAL_JOB_STATUSES = frozenset({"done", "failed", "cancelled"})
 JOB_EVENT_TYPES = ("job.progress", "job.done", "job.failed", "clip.ready")
+ACCOUNT_PLATFORMS = ("youtube", "tiktok", "instagram")
+ACCOUNT_AUTH_METHODS = ("api", "playwright")
+ACCOUNT_STATUSES = ("pending", "connected", "expired", "error")
 
 
 def utcnow() -> datetime:
@@ -149,3 +152,30 @@ class JobEvent(SQLModel, table=True):
     event_type: str = Field(max_length=32)
     payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
+
+
+class SocialAccount(SQLModel, table=True):
+    """Cuenta social conectada por API oficial (OAuth) o perfil persistente Playwright."""
+
+    __tablename__ = "social_account"
+
+    id: str = Field(primary_key=True)
+    workspace_id: str = Field(foreign_key="workspace.id", index=True)
+    platform: str = Field(max_length=16, index=True)
+    display_name: str = Field(default="", max_length=200)
+    handle: str = Field(default="", max_length=200)
+    alias: str | None = Field(default=None, max_length=120)
+    avatar_url: str | None = None
+    auth_method: str = Field(default="api", max_length=16)
+    credentials_ref: str = Field(default="", max_length=255)
+    status: str = Field(default="pending", max_length=16)
+    is_default: bool = Field(default=False)
+    capabilities_json: dict[str, Any] = Field(
+        default_factory=dict, sa_column=Column(JSON, nullable=False)
+    )
+    external_account_id: str | None = Field(default=None, max_length=128)
+    token_expires_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
+    last_check_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
+    last_error: str | None = None
+    created_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
+    updated_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)

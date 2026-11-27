@@ -22,6 +22,12 @@ dependencies = [
   "opencv-python-headless>=4.10",
   "pillow>=11.0",
   "numpy>=2.1",
+  "cryptography>=44.0",
+  "keyring>=25.0",
+  "google-auth>=2.35",
+  "google-auth-oauthlib>=1.2",
+  "google-api-python-client>=2.150",
+  "playwright>=1.49",
   "mlx-whisper>=0.4 ; platform_machine == 'arm64' and sys_platform == 'darwin'",
 ]
 
