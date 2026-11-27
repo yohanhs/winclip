@@ -69,3 +69,26 @@ def test_env_reads_database_url_from_settings(monkeypatch, tmp_path: Path) -> No
     assert database.is_file()
     assert _tables(f"sqlite:///{database}") >= CORE_TABLES
     assert Settings().database_url == f"sqlite:///{database}"
+
+
+def test_clip_editor_overrides_migration_roundtrip(tmp_path: Path) -> None:
+    url = _url(tmp_path)
+    cfg = alembic_config(url)
+
+    def clip_columns() -> set[str]:
+        engine = create_engine(url)
+        try:
+            return {col["name"] for col in inspect(engine).get_columns("clip")}
+        finally:
+            engine.dispose()
+
+    command.upgrade(cfg, "head")
+    assert {"render_overrides", "subtitle_overrides"} <= clip_columns()
+
+    command.downgrade(cfg, "-1")
+    cols_after_down = clip_columns()
+    assert "render_overrides" not in cols_after_down
+    assert "subtitle_overrides" not in cols_after_down
+
+    command.upgrade(cfg, "head")
+    assert {"render_overrides", "subtitle_overrides"} <= clip_columns()

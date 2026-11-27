@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from winclip.pipeline.render_models import ReframeMode
-from winclip.pipeline.subtitles.presets import SubtitlePreset
+from winclip.pipeline.subtitles.presets import SubtitlePreset, available_presets, list_presets
 from winclip.publishers.base import DeliveryMode, PublishMeta
 from winclip.rules.schema import CampaignRules, RuleViolation, TemplateLanguage
 
@@ -128,6 +128,25 @@ class ProjectCreated(BaseModel):
 # --------------------------------------------------------------------------- clips
 
 
+class ClipWordOut(BaseModel):
+    """Palabra del tramo del clip con su clave estable y texto efectivo."""
+
+    key: str
+    index: int
+    original: str
+    text: str
+    start: float
+    end: float
+    edited: bool = False
+
+
+class ClipWordsOut(BaseModel):
+    """Lista ordenada de palabras de un clip (`GET /api/clips/{id}/words`)."""
+
+    clip_id: str
+    words: list[ClipWordOut] = Field(default_factory=list)
+
+
 class ClipOut(BaseModel):
     """Clip con URLs de video y miniatura."""
 
@@ -147,6 +166,12 @@ class ClipOut(BaseModel):
     video_url: str | None = None
     thumb_url: str | None = None
     rule_violations: list[RuleViolation] = Field(default_factory=list)
+    subtitle_preset: str | None = None
+    reframe_mode: ReframeMode | None = None
+    crop_x_pct: float | None = None
+    crop_y_pct: float | None = None
+    zoom_pct: float | None = None
+    subtitle_overrides: dict[str, str] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 
@@ -159,6 +184,45 @@ class ClipUpdate(BaseModel):
     hashtags: list[str] | None = None
     start_sec: Annotated[float | None, Field(ge=0)] = None
     end_sec: Annotated[float | None, Field(ge=0)] = None
+    subtitle_preset: str | None = None
+    reframe_mode: ReframeMode | None = None
+    crop_x_pct: Annotated[float | None, Field(ge=0.0, le=100.0)] = None
+    crop_y_pct: Annotated[float | None, Field(ge=0.0, le=100.0)] = None
+    zoom_pct: Annotated[float | None, Field(ge=50.0, le=200.0)] = None
+    subtitle_overrides: dict[str, str] | None = None
+
+    @field_validator("subtitle_preset")
+    @classmethod
+    def _valid_subtitle_preset(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("subtitle_preset no puede estar vacío")
+        if cleaned not in list_presets():
+            raise ValueError(
+                f"subtitle_preset desconocido: {cleaned!r}; disponibles: {available_presets()}"
+            )
+        return cleaned
+
+    @field_validator("subtitle_overrides")
+    @classmethod
+    def _valid_subtitle_overrides(cls, value: dict[str, str] | None) -> dict[str, str] | None:
+        if value is None:
+            return None
+        cleaned: dict[str, str] = {}
+        for raw_key, raw_word in value.items():
+            key = str(raw_key).strip()
+            if not key:
+                raise ValueError("las claves de subtitle_overrides no pueden estar vacías")
+            word = str(raw_word).strip()
+            if len(word) > 64:
+                raise ValueError(
+                    f"la palabra corregida para {key!r} supera el máximo de 64 caracteres"
+                )
+            if word:
+                cleaned[key] = word
+        return cleaned
 
 
 # --------------------------------------------------------------------------- presets

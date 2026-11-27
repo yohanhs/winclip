@@ -14,8 +14,10 @@ from sqlmodel import Session
 
 from winclip.core.models import Campaign, Clip, Project, utcnow
 from winclip.core.storage import LocalStorage, StoragePathError
+from winclip.pipeline.schemas import Transcript
+from winclip.pipeline.subtitles.layout import MIN_WORD_DURATION, word_override_key
 from winclip.routers.deps import EngineDep, SessionDep, SettingsDep
-from winclip.routers.schemas import ClipOut, ClipUpdate, JobOut
+from winclip.routers.schemas import ClipOut, ClipUpdate, ClipWordOut, ClipWordsOut, JobOut
 from winclip.routers.serializers import clip_out
 from winclip.rules.schema import CampaignRules, RuleViolation
 from winclip.rules.validator import validate_candidate
@@ -25,6 +27,13 @@ router = APIRouter(prefix="/api/clips", tags=["clips"])
 
 RANGE_CHUNK_BYTES = 256 * 1024
 RANGE_PATTERN = re.compile(r"^bytes=(\d*)-(\d*)$")
+RENDER_OVERRIDE_FIELDS = (
+    "subtitle_preset",
+    "reframe_mode",
+    "crop_x_pct",
+    "crop_y_pct",
+    "zoom_pct",
+)
 
 
 def _clip_or_404(session: Session, clip_id: str) -> Clip:
@@ -181,9 +190,68 @@ def get_clip_thumb(
     )
 
 
+@router.get("/{clip_id}/words", response_model=ClipWordsOut, operation_id="getClipWords")
+def get_clip_words(
+    clip_id: str,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> ClipWordsOut:
+    """Devuelve las palabras del tramo del clip con sus overrides aplicados."""
+    clip = _clip_or_404(session, clip_id)
+    storage = LocalStorage(settings.storage_dir)
+    transcript_path = storage.transcript_path(clip.project_id)
+    if not transcript_path.is_file():
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"el proyecto {clip.project_id} no tiene transcripción disponible",
+        )
+    try:
+        transcript = Transcript.model_validate(storage.read_json(transcript_path))
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"la transcripción del proyecto {clip.project_id} es inválida",
+        ) from exc
+
+    overrides = dict(clip.subtitle_overrides or {})
+    start = clip.start_sec
+    end = clip.end_sec
+    previous_end = 0.0
+    words: list[ClipWordOut] = []
+
+    for segment in transcript.segments:
+        for word in segment.words:
+            original = word.w.strip()
+            if not original:
+                continue
+            if word.e <= start or word.s >= end:
+                continue
+            clipped_start = max(0.0, word.s - start)
+            clipped_end = min(end, word.e) - start
+            clipped_start = max(clipped_start, previous_end)
+            clipped_end = max(clipped_end, clipped_start + MIN_WORD_DURATION)
+            previous_end = clipped_end
+
+            key = word_override_key(word.s, word.e)
+            override = overrides.get(key)
+            effective = override.strip() if override is not None and override.strip() else original
+            words.append(
+                ClipWordOut(
+                    key=key,
+                    index=len(words),
+                    original=original,
+                    text=effective,
+                    start=round(clipped_start, 3),
+                    end=round(clipped_end, 3),
+                    edited=effective != original,
+                )
+            )
+    return ClipWordsOut(clip_id=clip.id, words=words)
+
+
 @router.patch("/{clip_id}", response_model=ClipOut, operation_id="updateClip")
 def update_clip(clip_id: str, payload: ClipUpdate, session: SessionDep) -> ClipOut:
-    """Actualiza metadatos y tiempos (validando `0 <= start < end`)."""
+    """Actualiza metadatos, tiempos y overrides de subtítulos/render."""
     clip = _clip_or_404(session, clip_id)
     changes = payload.model_dump(exclude_unset=True)
 
@@ -204,6 +272,22 @@ def update_clip(clip_id: str, payload: ClipUpdate, session: SessionDep) -> ClipO
     clip.start_sec = round(start, 3)
     clip.end_sec = round(end, 3)
     clip.duration = round(end - start, 3)
+
+    if any(field in changes for field in RENDER_OVERRIDE_FIELDS):
+        render_overrides = dict(clip.render_overrides or {})
+        for field in RENDER_OVERRIDE_FIELDS:
+            if field not in changes:
+                continue
+            value = changes[field]
+            if value is None:
+                render_overrides.pop(field, None)
+            else:
+                render_overrides[field] = value
+        clip.render_overrides = render_overrides or None
+
+    if "subtitle_overrides" in changes:
+        raw_sub_overrides = changes["subtitle_overrides"]
+        clip.subtitle_overrides = dict(raw_sub_overrides) if raw_sub_overrides else None
 
     candidate = dict(clip.candidate or {})
     candidate.update(

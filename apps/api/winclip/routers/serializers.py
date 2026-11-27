@@ -42,6 +42,7 @@ def clip_out(clip: Clip) -> ClipOut:
                 violations.append(RuleViolation.model_validate(item))
             except ValueError:
                 continue
+    overrides = clip.render_overrides or {}
     return ClipOut(
         **{
             field: getattr(clip, field)
@@ -64,6 +65,12 @@ def clip_out(clip: Clip) -> ClipOut:
         video_url=f"/api/clips/{clip.id}/file" if rendered else None,
         thumb_url=f"/api/clips/{clip.id}/thumb" if rendered and clip.thumb_path else None,
         rule_violations=violations,
+        subtitle_preset=overrides.get("subtitle_preset"),
+        reframe_mode=overrides.get("reframe_mode"),
+        crop_x_pct=overrides.get("crop_x_pct"),
+        crop_y_pct=overrides.get("crop_y_pct"),
+        zoom_pct=overrides.get("zoom_pct"),
+        subtitle_overrides=dict(clip.subtitle_overrides or {}),
     )
 
 

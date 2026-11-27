@@ -113,6 +113,12 @@ class Clip(SQLModel, table=True):
     start_sec: float = Field(default=0.0)
     end_sec: float = Field(default=0.0)
     duration: float = Field(default=0.0)
+    render_overrides: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    subtitle_overrides: dict[str, str] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
     created_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
     updated_at: datetime = Field(sa_type=UTCDateTime, default_factory=utcnow)
 

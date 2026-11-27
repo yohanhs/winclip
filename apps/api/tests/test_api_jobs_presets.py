@@ -21,6 +21,7 @@ EXPECTED_OPERATION_IDS = {
     ("/api/clips/{clip_id}/rerender", "post"): "rerenderClip",
     ("/api/clips/{clip_id}/file", "get"): "getClipFile",
     ("/api/clips/{clip_id}/thumb", "get"): "getClipThumb",
+    ("/api/clips/{clip_id}/words", "get"): "getClipWords",
     ("/api/campaigns", "get"): "listCampaigns",
     ("/api/campaigns", "post"): "createCampaign",
     ("/api/campaigns/templates", "get"): "listCampaignTemplates",
