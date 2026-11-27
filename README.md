@@ -5,9 +5,10 @@ clipping: a partir de un vídeo largo (URL o archivo) genera cortes verticales 9
 palabra a palabra, siguiendo las reglas de una campaña, los revisa en una web y los publica en cuentas
 de YouTube, TikTok e Instagram ya configuradas.
 
-> Estado: **pipeline local completo, API/cola SSE e interfaz web de proyectos y revisión de clips 9:16**.
-> Las reglas de campañas (`add-campaign-rules`), cuentas sociales (`add-social-accounts`) y publicación
-> multi-red (`add-publishers`) llegan en los siguientes changes de OpenSpec.
+> Estado: **pipeline local completo, API/cola SSE, reglas de campaña (`/campaigns`) e interfaz web de
+> proyectos y revisión de clips 9:16**. Las cuentas sociales (`add-social-accounts`), publicación
+> multi-red (`add-publishers`) y controles avanzados de edición (`add-clip-editor-controls`) llegan en
+> los siguientes changes de OpenSpec.
 
 ## Requisitos
 
@@ -197,11 +198,25 @@ curl -N 'http://127.0.0.1:8000/api/events?project_id=<id>'
 ```
 
 - Proyectos: `POST/GET/DELETE /api/projects` y `GET /api/projects/{id}/clips`.
+- Campañas: `GET/POST/PATCH/DELETE /api/campaigns`, `POST /api/campaigns/{id}/duplicate`,
+  `GET /api/campaigns/templates` (plantillas ES/EN en `assets/campaign-templates/`),
+  `POST /api/campaigns/parse` (convierte un brief en texto libre en reglas propuestas con
+  `inferred_fields` sin persistir) y `POST /api/campaigns/watermarks` (subida segura PNG/WebP ≤ 5 MB).
 - Clips: `PATCH/DELETE /api/clips/{id}`, `POST /api/clips/{id}/rerender` y entrega de MP4/JPEG con
   `Range` y `206` en `/file` y `/thumb`.
 - Trabajos: `GET /api/jobs/{id}`, `POST /api/jobs/{id}/cancel` (`409` si ya terminó).
 - Presets: `GET /api/presets` lee `assets/subtitle-presets/*.json`.
 - SSE: `job.progress`, `job.done`, `job.failed`, `clip.ready` y `heartbeat`, con `Last-Event-ID`.
+
+```bash
+# listar plantillas de ejemplo ES/EN
+curl -s http://127.0.0.1:8000/api/campaigns/templates
+
+# analizar un brief en texto libre sin guardarlo (devuelve rules + inferred_fields)
+curl -s -X POST http://127.0.0.1:8000/api/campaigns/parse \
+  -H 'content-type: application/json' \
+  -d '{"source_text":"Clips en español de 20 a 55s con #finanzas y sin decir garantizado."}'
+```
 
 La cola vive en la tabla `job`: un trabajo pesado a la vez (GPU/MLX/ffmpeg), concurrencia ligera
 configurable, reintentos con backoff, cancelación cooperativa y recuperación de huérfanos al
@@ -219,15 +234,20 @@ pnpm gen:api
 
 Rutas principales:
 
+- `/campaigns`: gestión de campañas con listado, plantillas de ejemplo ES/EN, duplicación,
+  eliminación con confirmación, editor estructurado completo (incluyendo subida PNG/WebP de
+  marca de agua), pestaña `"Pegar brief (IA)"` con badges violeta `IA` en `inferred_fields` y
+  vista previa JSON sincronizada.
 - `/projects`: listado de proyectos con métricas reales, filtros por estado/idioma, vista grid/lista,
   progreso en vivo por SSE y eliminación con confirmación.
 - `/projects/new`: creación por URL (JSON) o archivo local (multipart con progreso real y cancelación),
-  cantidad de clips o modo `"Máximo posible"` (`"max"`), idioma (`auto`/`es`/`en`), reencuadre
-  (`face`/`center`/`blur`/`passthrough`) y previsualización 9:16 en vivo del preset de subtítulos.
+  selector de campaña activa (heredando `requested_clips`, idioma y preset), cantidad de clips o
+  modo `"Máximo posible"` (`"max"`), idioma (`auto`/`es`/`en`), reencuadre (`face`/`center`/`blur`/`passthrough`)
+  y previsualización 9:16 en vivo del preset de subtítulos.
 - `/projects/[id]`: stepper en vivo de las 4 etapas (`Descarga → Transcripción → Selección → Render`)
-  con cancelación, grid responsive de cards 9:16 con `hover-play`, reproductor, edición de metadatos,
-  recorte con mini timeline y re-renderizado, descarga MP4, eliminación y multiselección (con
-  `"Publicar en redes →"` reservado para el change 8).
+  con cancelación, filtro `"Alertas"`, grid responsive de cards 9:16 con `hover-play`, alertas de
+  `rule_violations`, reproductor, edición de metadatos, recorte con mini timeline y re-renderizado,
+  descarga MP4, eliminación y multiselección (con `"Publicar en redes →"` reservado para el change 8).
 - `/settings/status`: comprobaciones reales de `GET /api/health`.
 
 ## Estructura

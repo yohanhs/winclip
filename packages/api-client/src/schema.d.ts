@@ -173,6 +173,158 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Campaigns
+         * @description Lista las campañas del workspace ordenadas por última actualización.
+         */
+        get: operations["listCampaigns"];
+        put?: never;
+        /**
+         * Create Campaign
+         * @description Crea una campaña persistida en SQLite para el workspace activo.
+         */
+        post: operations["createCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campaigns/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Campaign Templates
+         * @description Plantillas predefinidas ES/EN listas para precargar en el editor.
+         */
+        get: operations["listCampaignTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campaigns/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Brief
+         * @description Convierte un brief en texto libre en una propuesta de reglas sin persistir.
+         */
+        post: operations["parseCampaignBrief"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campaigns/watermarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Watermark
+         * @description Sube una imagen PNG o WebP (máx. 5 MB) bajo `storage/campaigns/watermarks/`.
+         */
+        post: operations["uploadCampaignWatermark"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campaigns/watermarks/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Watermark
+         * @description Sirve una imagen de marca de agua previamente subida.
+         */
+        get: operations["getCampaignWatermark"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campaigns/{campaign_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Campaign
+         * @description Devuelve el detalle de una campaña.
+         */
+        get: operations["getCampaign"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Campaign
+         * @description Elimina la campaña; los proyectos asociados conservan sus clips con `campaign_id = null`.
+         */
+        delete: operations["deleteCampaign"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Campaign
+         * @description Actualiza parcialmente nombre, reglas y/o texto fuente de una campaña.
+         */
+        patch: operations["updateCampaign"];
+        trace?: never;
+    };
+    "/api/campaigns/{campaign_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duplicate Campaign
+         * @description Clona una campaña independiente con nuevo ULID y nombre `<name> (copia)`.
+         */
+        post: operations["duplicateCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -257,6 +409,158 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_uploadCampaignWatermark */
+        Body_uploadCampaignWatermark: {
+            /** File */
+            file: string;
+        };
+        /**
+         * CampaignCreate
+         * @description Cuerpo de `POST /api/campaigns`.
+         */
+        CampaignCreate: {
+            /** Name */
+            name: string;
+            rules: components["schemas"]["CampaignRules"];
+            /** Source Text */
+            source_text?: string | null;
+        };
+        /**
+         * CampaignOut
+         * @description Campaña persistida con sus reglas estructuradas.
+         */
+        CampaignOut: {
+            /** Id */
+            id: string;
+            /** Workspace Id */
+            workspace_id: string;
+            /** Name */
+            name: string;
+            rules: components["schemas"]["CampaignRules"];
+            /** Source Text */
+            source_text?: string | null;
+            /**
+             * Projects Count
+             * @default 0
+             */
+            projects_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * CampaignParseOut
+         * @description Propuesta generada desde un brief en texto libre (sin persistir).
+         */
+        CampaignParseOut: {
+            rules: components["schemas"]["CampaignRules"];
+            /** Inferred Fields */
+            inferred_fields?: string[];
+            /** Warnings */
+            warnings?: string[];
+            /** Provider */
+            provider: string;
+        };
+        /**
+         * CampaignParseRequest
+         * @description Cuerpo de `POST /api/campaigns/parse`.
+         */
+        CampaignParseRequest: {
+            /** Source Text */
+            source_text: string;
+        };
+        /**
+         * CampaignRules
+         * @description Reglas de una campaña (`docs/architecture.md §6.4`) con validación estricta.
+         */
+        CampaignRules: {
+            /**
+             * Name
+             * @default default
+             */
+            name: string;
+            /**
+             * Language
+             * @default auto
+             * @enum {string}
+             */
+            language: "es" | "en" | "auto";
+            /**
+             * Min Duration
+             * @default 20
+             */
+            min_duration: number;
+            /**
+             * Max Duration
+             * @default 60
+             */
+            max_duration: number;
+            /** Max Clips */
+            max_clips?: number | null;
+            /** Priority Topics */
+            priority_topics?: string[];
+            /** Banned Topics */
+            banned_topics?: string[];
+            /** Banned Words */
+            banned_words?: string[];
+            /** Required Keywords */
+            required_keywords?: string[];
+            /** Tone */
+            tone?: string | null;
+            /**
+             * Hook Max Seconds
+             * @default 3
+             */
+            hook_max_seconds: number;
+            /** Cta Text */
+            cta_text?: string | null;
+            /** Hashtags */
+            hashtags?: string[];
+            /** Subtitle Preset */
+            subtitle_preset?: string | null;
+            /** Watermark Path */
+            watermark_path?: string | null;
+            /** Target Platforms */
+            target_platforms?: ("youtube" | "tiktok" | "instagram")[];
+            /** Extra Instructions */
+            extra_instructions?: string | null;
+        };
+        /**
+         * CampaignTemplateOut
+         * @description Plantilla predefinida de campaña ES/EN.
+         */
+        CampaignTemplateOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "es" | "en";
+            rules: components["schemas"]["CampaignRules"];
+        };
+        /**
+         * CampaignUpdate
+         * @description Actualización parcial de `PATCH /api/campaigns/{id}`.
+         */
+        CampaignUpdate: {
+            /** Name */
+            name?: string | null;
+            rules?: components["schemas"]["CampaignRules"] | null;
+            /** Source Text */
+            source_text?: string | null;
+        };
         /** CheckOut */
         CheckOut: {
             /** Name */
@@ -302,6 +606,8 @@ export interface components {
             video_url?: string | null;
             /** Thumb Url */
             thumb_url?: string | null;
+            /** Rule Violations */
+            rule_violations?: components["schemas"]["RuleViolation"][];
             /**
              * Created At
              * Format: date-time
@@ -432,6 +738,8 @@ export interface components {
             workspace_id: string;
             /** Campaign Id */
             campaign_id?: string | null;
+            /** Campaign Name */
+            campaign_name?: string | null;
             /** Source Type */
             source_type: string;
             /** Source Url */
@@ -471,6 +779,23 @@ export interface components {
             updated_at: string;
             /** Jobs */
             jobs?: components["schemas"]["JobOut"][];
+        };
+        /**
+         * RuleViolation
+         * @description Infracción estructurada de una regla, embebida en `candidates.json §6.2`.
+         */
+        RuleViolation: {
+            /** Code */
+            code: string;
+            /** Field */
+            field: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "warning" | "error";
+            /** Message */
+            message: string;
         };
         /**
          * SubtitlePresetOut
@@ -532,6 +857,14 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WatermarkUploadOut
+         * @description Respuesta de `POST /api/campaigns/watermarks`.
+         */
+        WatermarkUploadOut: {
+            /** Watermark Path */
+            watermark_path: string;
         };
     };
     responses: never;
@@ -894,6 +1227,302 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listCampaigns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"][];
+                };
+            };
+        };
+    };
+    createCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listCampaignTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignTemplateOut"][];
+                };
+            };
+        };
+    };
+    parseCampaignBrief: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignParseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignParseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uploadCampaignWatermark: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_uploadCampaignWatermark"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatermarkUploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getCampaignWatermark: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deleteCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    updateCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicateCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
                 };
             };
             /** @description Validation Error */

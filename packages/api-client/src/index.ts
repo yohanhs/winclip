@@ -34,6 +34,15 @@ export type JobOut = Components["schemas"]["JobOut"];
 export type JobSummary = Components["schemas"]["JobSummary"];
 export type HealthCheck = Components["schemas"]["CheckOut"];
 export type ClipUpdate = Components["schemas"]["ClipUpdate"];
+export type RuleViolation = Components["schemas"]["RuleViolation"];
+export type CampaignRules = Components["schemas"]["CampaignRules"];
+export type CampaignOut = Components["schemas"]["CampaignOut"];
+export type CampaignCreate = Components["schemas"]["CampaignCreate"];
+export type CampaignUpdate = Components["schemas"]["CampaignUpdate"];
+export type CampaignTemplateOut = Components["schemas"]["CampaignTemplateOut"];
+export type CampaignParseRequest = Components["schemas"]["CampaignParseRequest"];
+export type CampaignParseOut = Components["schemas"]["CampaignParseOut"];
+export type WatermarkUploadOut = Components["schemas"]["WatermarkUploadOut"];
 
 /** Evento SSE tal y como lo entrega `GET /api/events`. */
 export interface SseEvent {

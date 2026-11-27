@@ -36,9 +36,8 @@ from winclip.pipeline.segment import (
 )
 from winclip.rules.schema import CampaignRules, RuleViolation, load_rules
 from winclip.rules.validator import (
-    build_candidate_text,
     duration_allowed,
-    validate_candidate_text,
+    validate_candidate,
 )
 
 CHUNK_CANDIDATES_PER_REQUEST = 10
@@ -202,6 +201,8 @@ def _render_rules_block(rules: CampaignRules) -> str:
         lines.append(f"- CTA: {rules.cta_text}")
     if rules.hashtags:
         lines.append(f"- Hashtags sugeridos: {', '.join(rules.hashtags)}")
+    if rules.target_platforms:
+        lines.append(f"- Plataformas objetivo: {', '.join(rules.target_platforms)}")
     if rules.extra_instructions:
         lines.append(f"- Instrucciones extra: {rules.extra_instructions}")
     return "\n".join(lines)
@@ -340,12 +341,21 @@ def _prepare_candidate(
     title = _clean_text(proposal.title) or _fallback_text(clip_text, 70)
     hook = _clean_text(proposal.hook) or _fallback_text(clip_text, 90)
     description = _clean_text(proposal.description)
-    validation = validate_candidate_text(
-        build_candidate_text(clip_text, title=title, hook=hook, description=description),
-        rules,
+    if rules.cta_text and rules.cta_text.casefold() not in description.casefold():
+        description = (
+            f"{description}\n\n{rules.cta_text}".strip() if description else rules.cta_text
+        )
+    hashtags = _normalize_hashtags(proposal.hashtags)
+    violations = validate_candidate(
+        start=start,
+        end=end,
+        rules=rules,
+        clip_text=clip_text,
+        title=title,
+        hook=hook,
+        description=description,
+        hashtags=hashtags,
     )
-    if validation.rejected:
-        return None
 
     return ClipCandidate(
         id=new_ulid(),
@@ -354,11 +364,11 @@ def _prepare_candidate(
         title=title,
         hook=hook,
         description=description,
-        hashtags=_normalize_hashtags(proposal.hashtags),
+        hashtags=hashtags,
         score=proposal.score,
         reason=_clean_text(proposal.reason) or "propuesta del modelo",
         language=language,
-        rule_violations=validation.violations,
+        rule_violations=violations,
     )
 
 
@@ -436,6 +446,8 @@ def select_clips(
     settings: Settings | None = None,
     count: int | str = 10,
     rules_path: Path | str | None = None,
+    rules: CampaignRules | None = None,
+    campaign_id: str | None = None,
     use_cache: bool = True,
     router: LLMRouter | None = None,
     router_factory: Callable[[], LLMRouter] | None = None,
@@ -445,7 +457,12 @@ def select_clips(
     settings = settings or get_settings()
     storage = storage or LocalStorage(settings.storage_dir)
     requested = parse_requested(count)
-    rules = load_rules(rules_path) if rules_path is not None else CampaignRules()
+    active_rules = (
+        rules
+        if rules is not None
+        else (load_rules(rules_path) if rules_path is not None else CampaignRules())
+    )
+    rules = active_rules
 
     transcript = _load_transcript(storage, project_id)
     index = _build_index(transcript)
@@ -553,7 +570,7 @@ def select_clips(
 
     document = CandidatesDocument(
         project_id=project_id,
-        campaign_id=None,
+        campaign_id=campaign_id,
         requested=requested,
         provider=provider_id,
         candidates=final,

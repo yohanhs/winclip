@@ -19,15 +19,16 @@ from sqlmodel import Session, select
 
 from winclip.core.config import Settings
 from winclip.core.ids import new_clip_id
-from winclip.core.models import Clip, Job, Project, utcnow
+from winclip.core.models import Campaign, Clip, Job, Project, utcnow
 from winclip.core.storage import LocalStorage
 from winclip.pipeline.ingest import extract_audio, probe_media
 from winclip.pipeline.ingest import ingest as run_ingest
-from winclip.pipeline.render import render_clip
+from winclip.pipeline.render import apply_campaign_to_render_options, render_clip
 from winclip.pipeline.render_models import RenderOptions, RenderProgress
 from winclip.pipeline.schemas import SourceMeta
 from winclip.pipeline.select import ClipCandidate, SelectionError, select_clips
 from winclip.pipeline.transcribe import transcribe as run_transcribe
+from winclip.rules.schema import CampaignRules
 from winclip.worker import queue
 
 PIPELINE_STAGES = ("ingest", "transcribe", "select", "render")
@@ -216,10 +217,30 @@ def _run_transcribe_stage(ctx: JobContext, project: Project, backends: PipelineB
     ctx.progress(TRANSCRIBE_PROGRESS_END, "transcribe")
 
 
+def _project_campaign(engine: Engine, project: Project) -> tuple[str | None, CampaignRules | None]:
+    if not project.campaign_id:
+        return None, None
+    with Session(engine) as session:
+        campaign = session.get(Campaign, project.campaign_id)
+    if campaign is None:
+        return None, None
+    return campaign.id, CampaignRules.model_validate(campaign.rules_json)
+
+
 def _run_select_stage(ctx: JobContext, project: Project, backends: PipelineBackends) -> None:
     ctx.check_cancel()
     requested: int | str = project.requested_clips or "max"
-    result = backends.select(project.id, settings=ctx.settings, count=requested)
+    campaign_id, campaign_rules = _project_campaign(ctx.engine, project)
+    if campaign_rules is not None:
+        result = backends.select(
+            project.id,
+            settings=ctx.settings,
+            count=requested,
+            rules=campaign_rules,
+            campaign_id=campaign_id,
+        )
+    else:
+        result = backends.select(project.id, settings=ctx.settings, count=requested)
     _sync_clips(ctx.engine, project.id, result.document.candidates)
     ctx.progress(SELECT_PROGRESS_END, "select")
 
@@ -255,15 +276,29 @@ def _sync_clips(engine: Engine, project_id: str, candidates: list[ClipCandidate]
         return saved
 
 
-def _render_options(project: Project, *, force: bool) -> RenderOptions:
+def _render_options(
+    project: Project,
+    *,
+    force: bool,
+    campaign_rules: CampaignRules | None = None,
+    storage: LocalStorage | None = None,
+) -> RenderOptions:
     mode = project.reframe_mode if project.reframe_mode != "passthrough" else "center"
-    return RenderOptions(
+    base = RenderOptions(
         preset=project.subtitle_preset,
         reframe=mode,  # type: ignore[arg-type]
         engine="ass",
         hook_overlay=True,
         force=force,
     )
+    if campaign_rules is not None and storage is not None:
+        return apply_campaign_to_render_options(
+            base,
+            campaign_rules,
+            storage=storage,
+            preset_overridden=True,
+        )
+    return base
 
 
 def _clip_for_project(engine: Engine, project_id: str, candidate_id: str) -> Clip | None:
@@ -356,7 +391,13 @@ def _run_render_stage(
     if not targets:
         raise HandlerError("el proyecto no tiene clips que renderizar")
 
-    options = _render_options(project, force=True)
+    _, campaign_rules = _project_campaign(ctx.engine, project)
+    options = _render_options(
+        project,
+        force=True,
+        campaign_rules=campaign_rules,
+        storage=ctx.storage,
+    )
     start_progress = SELECT_PROGRESS_END if clip is None else 0.0
     span = 100.0 - start_progress
     rendered: list[Clip] = []

@@ -25,7 +25,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from winclip.core.config import Settings, get_settings
 from winclip.core.ids import new_ulid, validate_project_id
-from winclip.core.storage import LocalStorage
+from winclip.core.storage import LocalStorage, StoragePathError
 from winclip.pipeline.ingest import probe_media
 from winclip.pipeline.reframe import (
     ReframeError,
@@ -62,14 +62,20 @@ from winclip.pipeline.subtitles.fonts import (
 from winclip.pipeline.subtitles.layout import build_cues, retime_words
 from winclip.pipeline.subtitles.pil_engine import SubtitleFrameRenderer
 from winclip.pipeline.subtitles.presets import SubtitlePreset, load_preset
+from winclip.rules.schema import CampaignRules, validate_watermark_path
 
 HOOK_CARD_FILENAME = "hook.png"
 HOOK_CARD_TOP = 0.14
 HOOK_CARD_HEIGHT = 0.08
 HOOK_FADE_SECONDS = 0.3
-WATERMARK_MAX_WIDTH = 190
+CTA_CARD_FILENAME = "cta.png"
+CTA_CARD_TOP = 0.54
+CTA_CARD_HEIGHT = 0.06
+CTA_FADE_SECONDS = 0.3
+WATERMARK_MAX_WIDTH = 152
 WATERMARK_MARGIN = 48
 WATERMARK_TOP = 120
+WATERMARK_OPACITY = 0.85
 THUMB_SAMPLES = 5
 THUMB_MIN_LUMINANCE = 15.0
 PROGRESS_REFRAME_END = 20.0
@@ -280,6 +286,93 @@ def build_hook_card(
     return path
 
 
+def build_cta_card(
+    cta_text: str,
+    path: Path,
+    *,
+    font_path: Path,
+    font_size: int,
+    width: int = OUTPUT_WIDTH,
+    height: int = OUTPUT_HEIGHT,
+) -> Path:
+    """Banner discreto de CTA sobre la zona segura de subtítulos para los últimos segundos."""
+    image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    cta_font_size = max(32, min(46, font_size - 12))
+    font = ImageFont.truetype(str(font_path), cta_font_size)
+    measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+
+    max_text_width = width - 2 * 110
+    lines: list[str] = []
+    current = ""
+    for word in cta_text.split():
+        trial = f"{current} {word}".strip()
+        if current and measure.textlength(trial, font=font) > max_text_width:
+            lines.append(current)
+            current = word
+        else:
+            current = trial
+    if current:
+        lines.append(current)
+    lines = lines[:2]
+
+    top = round(CTA_CARD_TOP * height)
+    line_height = round(cta_font_size * 1.25)
+    card_height = max(round(CTA_CARD_HEIGHT * height), line_height * len(lines) + 28)
+    max_line_width = max((measure.textlength(line, font=font) for line in lines), default=0.0)
+    pill_width = min(width - 120, int(max_line_width + 76))
+    left = (width - pill_width) // 2
+    draw.rounded_rectangle(
+        (left, top, left + pill_width, top + card_height),
+        radius=24,
+        fill=(17, 17, 20, 210),
+        outline=(245, 158, 11, 220),
+        width=3,
+    )
+    y = top + (card_height - line_height * len(lines)) / 2
+    for line in lines:
+        line_width = measure.textlength(line, font=font)
+        draw.text(
+            ((width - line_width) / 2, y),
+            line,
+            font=font,
+            fill=(250, 250, 250, 255),
+        )
+        y += line_height
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+    return path
+
+
+def apply_campaign_to_render_options(
+    options: RenderOptions,
+    rules: CampaignRules | None,
+    *,
+    storage: LocalStorage,
+    preset_overridden: bool = False,
+) -> RenderOptions:
+    """Aplica preset, `hook_max_seconds`, `watermark_path` seguro y `cta_text` de campaña."""
+    if rules is None:
+        return options
+    updates: dict[str, Any] = {}
+    if rules.subtitle_preset and not preset_overridden:
+        updates["preset"] = rules.subtitle_preset
+    updates["hook_seconds"] = min(options.hook_seconds, float(rules.hook_max_seconds))
+    if rules.cta_text and not options.cta_text:
+        updates["cta_text"] = rules.cta_text
+    if rules.watermark_path and options.watermark_path is None:
+        try:
+            validated = validate_watermark_path(rules.watermark_path)
+            resolved = None if validated is None else storage.resolve_safe(validated)
+        except (ValueError, StoragePathError) as exc:
+            raise RenderError(f"watermark_path inválido en campaña: {exc}") from exc
+        if resolved is not None and resolved.is_file():
+            updates["watermark_path"] = resolved
+    return options.model_copy(update=updates)
+
+
 def build_filter_graph(
     reframe_filter: str,
     *,
@@ -292,6 +385,8 @@ def build_filter_graph(
     watermark_input: int | None,
     overlay_input: int | None,
     has_audio: bool,
+    cta_input: int | None = None,
+    cta_start: float = 0.0,
 ) -> str:
     """Encadena reencuadre, overlays, subtítulos y audio en un solo `filter_complex`."""
     parts = [reframe_filter]
@@ -309,10 +404,18 @@ def build_filter_graph(
     if watermark_input is not None:
         parts.append(
             f"[{watermark_input}:v]scale={WATERMARK_MAX_WIDTH}:-2,format=rgba,"
-            "colorchannelmixer=aa=0.7[watermark]"
+            f"colorchannelmixer=aa={WATERMARK_OPACITY:g}[watermark]"
         )
         parts.append(f"{current}[watermark]overlay=W-w-{WATERMARK_MARGIN}:{WATERMARK_TOP}[vwm]")
         current = "[vwm]"
+
+    if cta_input is not None:
+        parts.append(
+            f"[{cta_input}:v]format=rgba,"
+            f"fade=t=in:st={cta_start:.3f}:d={CTA_FADE_SECONDS:.3f}:alpha=1[ctacard]"
+        )
+        parts.append(f"{current}[ctacard]overlay=0:0:enable='gte(t,{cta_start:.3f})'[vcta]")
+        current = "[vcta]"
 
     if engine == "ass":
         parts.append(f"{current}ass=filename='{subtitles_path}':fontsdir='{fonts_dir}'[vsub]")
@@ -504,6 +607,8 @@ def compute_fingerprint(
             "hook_seconds": options.hook_seconds,
             "sample_fps": options.sample_fps,
             "watermark": watermark,
+            "cta_text": options.cta_text,
+            "cta_seconds": options.cta_seconds,
         },
         "preset": preset.model_dump(mode="json"),
         "fps": fps,
@@ -638,6 +743,7 @@ def build_ffmpeg_command(
     watermark: Path | None,
     overlay: bool,
     has_audio: bool,
+    cta_card: Path | None = None,
 ) -> tuple[list[str], int | None, int | None, int | None]:
     """Comando ffmpeg y los índices de entrada de hook, marca de agua y overlay."""
     command: list[str] = [str(ffmpeg_bin)]
@@ -669,6 +775,9 @@ def build_ffmpeg_command(
     if watermark is not None:
         command.extend(["-loop", "1", "-i", str(watermark)])
         watermark_input = index
+        index += 1
+    if cta_card is not None:
+        command.extend(["-loop", "1", "-framerate", f"{fps:g}", "-i", str(cta_card)])
         index += 1
     if overlay:
         command.extend(
@@ -726,6 +835,7 @@ def render_clip(
     settings: Settings | None = None,
     on_progress: Callable[[RenderProgress], None] | None = None,
     clip_id: str | None = None,
+    campaign_rules: CampaignRules | None = None,
 ) -> RenderManifest:
     """Renderiza un candidato a `clips/<clip_id>/` y devuelve su manifiesto.
 
@@ -736,6 +846,8 @@ def render_clip(
     settings = settings or get_settings()
     storage = LocalStorage(settings.storage_dir)
     validate_project_id(project_id)
+    if campaign_rules is not None:
+        options = apply_campaign_to_render_options(options, campaign_rules, storage=storage)
 
     transcript = load_transcript(storage, project_id)
     document = load_candidates(storage, project_id)
@@ -838,6 +950,8 @@ def render_clip(
         reporter.emit("subtitles", PROGRESS_SUBTITLES_END, f"{len(cues)} bloques")
 
         hook_active = options.hook_overlay and bool(candidate.hook.strip())
+        cta_active = bool((options.cta_text or "").strip())
+        cta_start = max(0.0, round(duration - options.cta_seconds, 3))
         encoder = detect_video_encoder(settings)
         subtitles_path = tmp_dir / SUBTITLES_FILENAME
         with tempfile.TemporaryDirectory(prefix="winclip-render-") as work_raw:
@@ -850,18 +964,30 @@ def render_clip(
                     font_path=font.font.path,
                     font_size=max(40, preset.font_size - 6),
                 )
+            cta_card: Path | None = None
+            if cta_active and options.cta_text:
+                cta_card = build_cta_card(
+                    options.cta_text,
+                    work / CTA_CARD_FILENAME,
+                    font_path=font.font.path,
+                    font_size=max(40, preset.font_size - 6),
+                )
             with fonts_directory(font_files) as fonts_dir:
                 filter_script = work / "filter_complex.txt"
                 overlay = options.engine == "pil"
                 next_index = 1
                 hook_index: int | None = None
                 watermark_index: int | None = None
+                cta_index: int | None = None
                 overlay_index: int | None = None
                 if hook_card is not None:
                     hook_index = next_index
                     next_index += 1
                 if options.watermark_path is not None:
                     watermark_index = next_index
+                    next_index += 1
+                if cta_card is not None:
+                    cta_index = next_index
                     next_index += 1
                 if overlay:
                     overlay_index = next_index
@@ -881,6 +1007,8 @@ def render_clip(
                     watermark_input=watermark_index,
                     overlay_input=overlay_index,
                     has_audio=probe.has_audio,
+                    cta_input=cta_index,
+                    cta_start=cta_start,
                 )
                 filter_script.write_text(graph + "\n", encoding="utf-8")
                 command, _, _, _ = build_ffmpeg_command(
@@ -897,6 +1025,7 @@ def render_clip(
                     watermark=options.watermark_path,
                     overlay=overlay,
                     has_audio=probe.has_audio,
+                    cta_card=cta_card,
                 )
 
                 reporter.emit("encode", PROGRESS_SUBTITLES_END, f"codificando con {encoder}")

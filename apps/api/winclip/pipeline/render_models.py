@@ -111,8 +111,10 @@ class RenderOptions(BaseModel):
     crop_y_pct: float = Field(default=50.0, ge=0.0, le=100.0)
     zoom_pct: float = Field(default=100.0, ge=100.0, le=300.0)
     hook_overlay: bool = True
-    hook_seconds: float = Field(default=3.0, ge=0.5, le=10.0)
+    hook_seconds: float = Field(default=3.0, ge=0.5, le=15.0)
     watermark_path: Path | None = None
+    cta_text: str | None = Field(default=None, max_length=200)
+    cta_seconds: float = Field(default=3.0, ge=0.5, le=10.0)
     force: bool = False
     sample_fps: float = Field(default=3.0, ge=2.0, le=4.0)
 
