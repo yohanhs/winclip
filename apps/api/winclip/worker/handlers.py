@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
@@ -21,11 +22,12 @@ from winclip.core.config import Settings
 from winclip.core.ids import new_clip_id, new_ulid
 from winclip.core.models import Campaign, Clip, Job, Project, Publication, SocialAccount, utcnow
 from winclip.core.storage import LocalStorage
+from winclip.llm.router import LLMRouter
 from winclip.pipeline.ingest import extract_audio, probe_media
 from winclip.pipeline.ingest import ingest as run_ingest
 from winclip.pipeline.render import apply_campaign_to_render_options, render_clip
 from winclip.pipeline.render_models import RenderOptions, RenderProgress
-from winclip.pipeline.schemas import SourceMeta
+from winclip.pipeline.schemas import SourceMeta, Transcript
 from winclip.pipeline.select import (
     CandidatesDocument,
     ClipCandidate,
@@ -43,7 +45,7 @@ from winclip.publishers.base import (
 )
 from winclip.publishers.quota import count_today_publications, daily_limit_for_account
 from winclip.publishers.registry import get_publisher
-from winclip.rules.schema import CampaignRules
+from winclip.rules.schema import CampaignRules, normalize_hashtags
 from winclip.worker import queue
 
 PUBLISH_BACKOFF_SCHEDULE = (30.0, 120.0, 600.0)
@@ -259,6 +261,77 @@ def _source_duration_seconds(ctx: JobContext, project: Project) -> float | None:
     return None
 
 
+class _ShortMetadataProposal(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = ""
+    hook: str = ""
+    description: str = ""
+    hashtags: list[str] = Field(default_factory=list)
+
+
+def _generate_short_metadata(
+    ctx: JobContext,
+    project: Project,
+    *,
+    language: str,
+    campaign_rules: CampaignRules | None,
+) -> _ShortMetadataProposal | None:
+    """Genera título, hook, descripción y hashtags con LLM para un short completo."""
+    transcript_snippet = ""
+    transcript_path = ctx.storage.transcript_path(project.id)
+    if transcript_path.is_file():
+        try:
+            transcript = Transcript.model_validate(ctx.storage.read_json(transcript_path))
+            transcript_snippet = " ".join(
+                seg.text.strip() for seg in transcript.segments if seg.text.strip()
+            )[:1500]
+        except Exception:
+            transcript_snippet = ""
+
+    rules_lines = [f"Language: {language}"]
+    if campaign_rules is not None:
+        rules_lines.append(f"Campaign: {campaign_rules.name}")
+        if campaign_rules.tone:
+            rules_lines.append(f"Tone: {campaign_rules.tone}")
+        if campaign_rules.priority_topics:
+            rules_lines.append(f"Priority topics: {', '.join(campaign_rules.priority_topics)}")
+        if campaign_rules.banned_topics:
+            rules_lines.append(f"Avoid strictly: {', '.join(campaign_rules.banned_topics)}")
+        if campaign_rules.banned_words:
+            rules_lines.append(f"Banned words: {', '.join(campaign_rules.banned_words)}")
+        if campaign_rules.hashtags:
+            rules_lines.append(f"Campaign hashtags: {', '.join(campaign_rules.hashtags)}")
+        if campaign_rules.cta_text:
+            rules_lines.append(f"CTA: {campaign_rules.cta_text}")
+        if campaign_rules.extra_instructions:
+            rules_lines.append(f"Extra instructions: {campaign_rules.extra_instructions[:600]}")
+
+    system = (
+        "You are a viral short-form video editor (TikTok, Instagram Reels, YouTube Shorts). "
+        "Return ONLY valid JSON with keys: title (<= 80 chars), hook (short punchy on-screen "
+        "text <= 75 chars), description (1-2 engaging sentences), and hashtags (4-6 relevant "
+        "#tags). Respect every campaign rule, tone, and language strictly."
+    )
+    user_msg = (
+        f"Video title: {project.title or 'Short video'}\n"
+        f"Campaign rules:\n" + "\n".join(rules_lines) + "\n"
+        f"Transcript/lyrics excerpt: {transcript_snippet or '(instrumental / visual video)'}"
+    )
+    try:
+        router = LLMRouter(ctx.settings)
+        result = router.complete_json(
+            system,
+            user_msg,
+            _ShortMetadataProposal,
+            logical_model="fast",
+            use_cache=True,
+        )
+        return result.data
+    except Exception:
+        return None
+
+
 def _build_full_short_fallback(
     ctx: JobContext,
     project: Project,
@@ -266,6 +339,7 @@ def _build_full_short_fallback(
     requested: int | str,
     campaign_id: str | None,
     campaign_rules: CampaignRules | None,
+    generate_metadata: bool = True,
 ) -> list[ClipCandidate]:
     """Cuando el vídeo ya es un short/musical y la IA devuelve 0 clips, conserva el clip entero."""
     duration = _source_duration_seconds(ctx, project)
@@ -292,14 +366,51 @@ def _build_full_short_fallback(
         except ValueError:
             existing_id = None
 
+    generated = (
+        _generate_short_metadata(
+            ctx,
+            project,
+            language=language,
+            campaign_rules=campaign_rules,
+        )
+        if generate_metadata
+        else None
+    )
+
+    title = (
+        " ".join(generated.title.split())[:120]
+        if generated and generated.title.strip()
+        else ((project.title or "Clip").strip()[:120] or "Clip")
+    )
+    hook = " ".join(generated.hook.split())[:90] if generated and generated.hook.strip() else ""
+    description = (
+        " ".join(generated.description.split())
+        if generated and generated.description.strip()
+        else ""
+    )
+    if (
+        campaign_rules is not None
+        and campaign_rules.cta_text
+        and campaign_rules.cta_text.casefold() not in description.casefold()
+    ):
+        description = (
+            f"{description}\n\n{campaign_rules.cta_text}".strip()
+            if description
+            else campaign_rules.cta_text
+        )
+    merged_tags = list(generated.hashtags if generated else []) + list(
+        campaign_rules.hashtags if campaign_rules is not None else []
+    )
+    hashtags = normalize_hashtags(merged_tags)
+
     candidate = ClipCandidate(
         id=existing_id or new_ulid(),
         start=0.0,
         end=end_sec,
-        title=(project.title or "Clip").strip()[:120] or "Clip",
-        hook="",
-        description=(campaign_rules.cta_text or "") if campaign_rules is not None else "",
-        hashtags=list(campaign_rules.hashtags) if campaign_rules is not None else [],
+        title=title,
+        hook=hook,
+        description=description,
+        hashtags=hashtags,
         score=75,
         reason="Clip completo del vídeo original (vídeo corto o sin diálogo seleccionado por IA)",
         language=language,
@@ -313,7 +424,7 @@ def _build_full_short_fallback(
         provider="passthrough:full-video",
         candidates=[candidate],
     )
-    ctx.storage.write_json_atomic(ctx.storage.selection_path(project.id), document)
+    ctx.storage.write_json_atomic(selection_path, document)
     return [candidate]
 
 
@@ -346,6 +457,7 @@ def _run_select_stage(ctx: JobContext, project: Project, backends: PipelineBacke
             requested=requested,
             campaign_id=campaign_id,
             campaign_rules=campaign_rules,
+            generate_metadata=backends.select is select_clips,
         )
 
     _sync_clips(ctx.engine, project.id, candidates)
