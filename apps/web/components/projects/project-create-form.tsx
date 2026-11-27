@@ -118,25 +118,28 @@ export function ProjectCreateForm() {
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const previewVideoUrl = useMemo(() => {
-    if (sourceType !== "file" || !file || typeof URL === "undefined" || !URL.createObjectURL) {
-      return null;
+  const handleFileChange = (nextFile: File | null) => {
+    setFile(nextFile);
+    if (previewUrlRef.current && typeof URL !== "undefined" && URL.revokeObjectURL) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    if (!nextFile || typeof URL === "undefined" || !URL.createObjectURL) {
+      setPreviewVideoUrl(null);
+      return;
     }
     try {
-      return URL.createObjectURL(file);
+      const nextUrl = URL.createObjectURL(nextFile);
+      previewUrlRef.current = nextUrl;
+      setPreviewVideoUrl(nextUrl);
     } catch {
-      return null;
+      setPreviewVideoUrl(null);
     }
-  }, [sourceType, file]);
-
-  useEffect(() => {
-    if (!previewVideoUrl) return;
-    return () => {
-      URL.revokeObjectURL(previewVideoUrl);
-    };
-  }, [previewVideoUrl]);
+  };
 
   const campaigns = campaignsQuery.data ?? [];
   const selectedCampaign =
@@ -327,7 +330,7 @@ export function ProjectCreateForm() {
               <TabsContent value="file" className="mt-0">
                 <FileDropzone
                   file={file}
-                  onFileChange={setFile}
+                  onFileChange={handleFileChange}
                   onCancelUpload={handleCancelUpload}
                   progress={uploadProgress}
                   uploading={isPending && sourceType === "file"}
@@ -564,7 +567,7 @@ export function ProjectCreateForm() {
               preset={preset}
               presetData={selectedPreset?.data ?? null}
               reframeMode={reframeMode}
-              videoSrc={previewVideoUrl}
+              videoSrc={sourceType === "file" ? previewVideoUrl : null}
             />
             <p className="mx-auto max-w-[286px] text-center text-[11px] leading-relaxed text-zinc-600">
               Así se verán los subtítulos y el encuadre en el clip final. Puedes
