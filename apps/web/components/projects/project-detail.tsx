@@ -38,7 +38,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [clipFilter, setClipFilter] = useState<"all" | "alerts">("all");
 
   const project = projectQuery.data;
-  const job = project?.active_job ?? project?.latest_job ?? null;
+  const rawJob = project?.active_job ?? project?.latest_job ?? null;
+  const job = rawJob && rawJob.type !== "publish" ? rawJob : null;
   const allClips = useMemo(() => clipsQuery.data ?? [], [clipsQuery.data]);
   const alertsCount = useMemo(
     () =>
