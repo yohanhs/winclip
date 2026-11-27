@@ -5,9 +5,9 @@ clipping: a partir de un vídeo largo (URL o archivo) genera cortes verticales 9
 palabra a palabra, siguiendo las reglas de una campaña, los revisa en una web y los publica en cuentas
 de YouTube, TikTok e Instagram ya configuradas.
 
-> Estado: **fundamentos, ingesta/transcripción y selección de clips (CLI)**. Este repositorio contiene
-> el monorepo, la configuración central, el diagnóstico del sistema, el esqueleto de la web y las tres
-> primeras etapas del pipeline. El render y la publicación llegan en los siguientes changes de OpenSpec.
+> Estado: **pipeline local completo, API/cola SSE e interfaz web de proyectos y revisión de clips 9:16**.
+> Las reglas de campañas (`add-campaign-rules`), cuentas sociales (`add-social-accounts`) y publicación
+> multi-red (`add-publishers`) llegan en los siguientes changes de OpenSpec.
 
 ## Requisitos
 
@@ -207,13 +207,36 @@ La cola vive en la tabla `job`: un trabajo pesado a la vez (GPU/MLX/ffmpeg), con
 configurable, reintentos con backoff, cancelación cooperativa y recuperación de huérfanos al
 reiniciar. `publish` está reservado para el change 8 y falla de forma controlada sin reintentos.
 
+## Interfaz web y cliente API tipado
+
+La web (`apps/web`) consume el cliente TypeScript generado desde el esquema OpenAPI de FastAPI en
+`packages/api-client` (`@winclip/api-client`):
+
+```bash
+# regenerar schema.d.ts y snapshot OpenAPI desde apps/api (sin levantar el servidor)
+pnpm gen:api
+```
+
+Rutas principales:
+
+- `/projects`: listado de proyectos con métricas reales, filtros por estado/idioma, vista grid/lista,
+  progreso en vivo por SSE y eliminación con confirmación.
+- `/projects/new`: creación por URL (JSON) o archivo local (multipart con progreso real y cancelación),
+  cantidad de clips o modo `"Máximo posible"` (`"max"`), idioma (`auto`/`es`/`en`), reencuadre
+  (`face`/`center`/`blur`/`passthrough`) y previsualización 9:16 en vivo del preset de subtítulos.
+- `/projects/[id]`: stepper en vivo de las 4 etapas (`Descarga → Transcripción → Selección → Render`)
+  con cancelación, grid responsive de cards 9:16 con `hover-play`, reproductor, edición de metadatos,
+  recorte con mini timeline y re-renderizado, descarga MP4, eliminación y multiselección (con
+  `"Publicar en redes →"` reservado para el change 8).
+- `/settings/status`: comprobaciones reales de `GET /api/health`.
+
 ## Estructura
 
 ```
 apps/api/            FastAPI + CLI + worker (Python 3.12, uv)
 apps/api/alembic/    migraciones versionadas de SQLite (render_as_batch)
 apps/web/            Next.js 16 (App Router, Tailwind v4, shadcn/ui)
-packages/api-client/ cliente TypeScript (se generará desde OpenAPI)
+packages/api-client/ cliente TypeScript generado desde OpenAPI (`pnpm gen:api`)
 assets/fonts/        fuentes OFL con sus licencias
 docs/architecture.md arquitectura y contratos entre changes
 openspec/            especificaciones y changes (OpenSpec)
@@ -222,9 +245,19 @@ openspec/            especificaciones y changes (OpenSpec)
 ## Tests y lint
 
 ```bash
+# Regenerar cliente API y comprobar tipos
+pnpm gen:api
+pnpm --filter @winclip/api-client typecheck
+
+# API (Python)
 uv run --project apps/api pytest
 uv run --project apps/api ruff check . && uv run --project apps/api ruff format --check .
-pnpm --filter web lint && pnpm --filter web build
+
+# Web (ESLint, TypeScript, Vitest, build y Playwright E2E)
+pnpm lint
+pnpm --filter web typecheck && pnpm --filter web build
+pnpm --filter web test
+pnpm --filter web test:e2e
 ```
 
 ## Seguridad

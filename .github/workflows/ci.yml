@@ -52,7 +52,7 @@ jobs:
         run: uv run pytest -m "not slow"
 
   web:
-    name: web (lint + build)
+    name: web (lint + test + build + e2e)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,9 +63,17 @@ jobs:
           cache: pnpm
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
+      - name: Typecheck api-client
+        run: pnpm --filter @winclip/api-client typecheck
       - name: Lint
         run: pnpm --filter web lint
       - name: Typecheck
         run: pnpm --filter web typecheck
+      - name: Tests unitarios y de componentes (Vitest)
+        run: pnpm --filter web test
       - name: Build
         run: pnpm --filter web build
+      - name: Instalar Chromium headless (Playwright)
+        run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: Tests E2E (Playwright)
+        run: pnpm --filter web test:e2e
