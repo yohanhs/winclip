@@ -12,6 +12,16 @@ vi.mock("@/hooks/use-clips", () => ({
   useCancelJob: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+vi.mock("@/hooks/use-accounts", () => ({
+  useAccounts: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock("@/hooks/use-publications", () => ({
+  usePublicationsQuota: () => ({ data: null, isLoading: false }),
+  usePreviewPublicationMeta: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePublications: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -50,15 +60,18 @@ describe("multiselección de clips", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 
-  it("mantiene Publicar en redes deshabilitado hasta el change 8", () => {
+  it("habilita Publicar en redes y abre el diálogo de publicación", () => {
     render(<ClipGrid projectId="proj-1" clips={CLIPS} projectDuration={600} />);
     fireEvent.click(screen.getByLabelText("Seleccionar Primer clip"));
 
     const publish = screen.getByRole("button", {
       name: /Publicar en redes/i,
     });
-    expect(publish).toBeDisabled();
-    expect(publish).toHaveAttribute("aria-disabled", "true");
+    expect(publish).toBeEnabled();
+    fireEvent.click(publish);
+    expect(
+      screen.getByRole("dialog", { name: "Publicar clips en redes sociales" }),
+    ).toBeInTheDocument();
   });
 
   it("muestra el estado vacío cuando no hay clips", () => {

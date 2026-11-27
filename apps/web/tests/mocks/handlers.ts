@@ -215,4 +215,19 @@ export const mswHandlers = [
       ],
     });
   }),
+
+  // Publications
+  http.get("/api/publications", () => {
+    return HttpResponse.json([]);
+  }),
+
+  http.get("/api/publications/quota", () => {
+    return HttpResponse.json({
+      youtube_units_used: 0,
+      youtube_units_limit: 10000,
+      youtube_upload_cost: 1600,
+      youtube_uploads_today: 0,
+      accounts: [],
+    });
+  }),
 ];

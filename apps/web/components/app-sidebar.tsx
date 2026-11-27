@@ -22,6 +22,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useHealth } from "@/hooks/use-api-client";
 import { useCampaigns } from "@/hooks/use-campaigns";
 import { useProjects } from "@/hooks/use-projects";
+import { usePublications } from "@/hooks/use-publications";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -47,6 +48,7 @@ export function AppSidebar({ appName }: { appName: string }) {
   const projects = useProjects();
   const campaigns = useCampaigns();
   const accounts = useAccounts();
+  const publications = usePublications();
 
   const checks = health.data?.checks ?? [];
   const hasError = health.isError || checks.some((check) => check.status === "error");
@@ -57,6 +59,9 @@ export function AppSidebar({ appName }: { appName: string }) {
   const projectCount = projects.data?.length ?? 0;
   const campaignCount = campaigns.data?.length ?? 0;
   const accountCount = accounts.data?.length ?? 0;
+  const pendingPublicationsCount = (publications.data ?? []).filter(
+    (item) => item.status === "scheduled" || item.status === "publishing",
+  ).length;
   const expiredAccountsCount = (accounts.data ?? []).filter(
     (item) => item.status === "expired" || item.status === "error",
   ).length;
@@ -80,7 +85,9 @@ export function AppSidebar({ appName }: { appName: string }) {
               ? campaignCount
               : href === "/accounts"
                 ? accountCount
-                : 0;
+                : href === "/publications"
+                  ? pendingPublicationsCount
+                  : 0;
         const showExpiredAlert = href === "/accounts" && expiredAccountsCount > 0;
         return (
           <Link

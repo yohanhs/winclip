@@ -11,6 +11,7 @@ import { downloadClipFile } from "@/lib/download";
 import { errorMessage } from "@/lib/api";
 import type { ClipOut } from "@winclip/api-client";
 
+import { PublishDialog } from "@/components/publications/publish-dialog";
 import { ClipCard } from "./clip-card";
 import { ClipEditDialog } from "./clip-edit-dialog";
 import { ClipPlayerDialog } from "./clip-player-dialog";
@@ -34,6 +35,7 @@ export function ClipGrid({
   const [playerClip, setPlayerClip] = useState<ClipOut | null>(null);
   const [editClip, setEditClip] = useState<ClipOut | null>(null);
   const [trimClip, setTrimClip] = useState<ClipOut | null>(null);
+  const [publishClips, setPublishClips] = useState<ClipOut[] | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const deleteClip = useDeleteClip(projectId);
 
@@ -166,6 +168,7 @@ export function ClipGrid({
             onTrim={setTrimClip}
             onDelete={handleDelete}
             onDownload={(item) => void handleDownload(item)}
+            onPublish={(item) => setPublishClips([item])}
             downloading={downloadingId === clip.id}
           />
         ))}
@@ -176,7 +179,29 @@ export function ClipGrid({
         total={clips.length}
         onSelectAll={selectAll}
         onClear={() => setSelectedIds(new Set())}
+        onPublish={() => {
+          const chosen = clips.filter(
+            (c) => selectedIds.has(c.id) && (c.status === "rendered" || c.status === "ready"),
+          );
+          if (chosen.length > 0) setPublishClips(chosen);
+        }}
+        publishDisabled={
+          !clips.some(
+            (c) => selectedIds.has(c.id) && (c.status === "rendered" || c.status === "ready"),
+          )
+        }
       />
+
+      {publishClips !== null && publishClips.length > 0 ? (
+        <PublishDialog
+          clips={publishClips}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPublishClips(null);
+          }}
+          onPublished={() => setSelectedIds(new Set())}
+        />
+      ) : null}
 
       <ClipPlayerDialog
         clip={playerClip}

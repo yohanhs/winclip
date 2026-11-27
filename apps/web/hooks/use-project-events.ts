@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { ProjectOut } from "@winclip/api-client";
+import type { ProjectOut, SsePublicationUpdated } from "@winclip/api-client";
 import { toast } from "sonner";
 
 import { API_URL } from "@/lib/api";
@@ -31,6 +31,7 @@ export type ProjectEvent =
   | { type: "job.done"; payload: JobEventPayload }
   | { type: "job.failed"; payload: JobEventPayload }
   | { type: "clip.ready"; payload: ClipReadyPayload }
+  | { type: "publication.updated"; payload: SsePublicationUpdated }
   | { type: "heartbeat"; payload: { ts: string } };
 
 interface UseProjectEventsOptions {
@@ -233,6 +234,13 @@ export function useProjectEvents(
         toast.message("Nuevo clip listo");
       }
       emit({ type: "clip.ready", payload: data });
+    });
+
+    listen("publication.updated", (payload) => {
+      const data = payload as SsePublicationUpdated;
+      void queryClient.invalidateQueries({ queryKey: ["publications"] });
+      void queryClient.invalidateQueries({ queryKey: ["publications-quota"] });
+      emit({ type: "publication.updated", payload: data });
     });
 
     listen("heartbeat", (payload) => {

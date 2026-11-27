@@ -8,6 +8,7 @@ import {
   Pencil,
   Play,
   Scissors,
+  Send,
   Trash2,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ export interface ClipCardProps {
   onTrim: (clip: ClipOut) => void;
   onDelete: (clip: ClipOut) => void;
   onDownload: (clip: ClipOut) => void;
+  onPublish?: (clip: ClipOut) => void;
   downloading?: boolean;
 }
 
@@ -56,6 +58,7 @@ export function ClipCard({
   onTrim,
   onDelete,
   onDownload,
+  onPublish,
   downloading = false,
 }: ClipCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -284,6 +287,19 @@ export function ClipCard({
                 <Download className="size-4" aria-hidden="true" />
               )}
             </Button>
+            {onPublish ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Publicar ${clip.title}`}
+                className="text-amber-400 hover:text-amber-300"
+                onClick={() => onPublish(clip)}
+                disabled={!isReady}
+              >
+                <Send className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null}
           </div>
           <Button
             type="button"

@@ -153,7 +153,7 @@ test.describe("Detalle de proyecto y revisión de clips (/projects/[id])", () =>
     });
     await expect(page.getByText("Re-renderizando…")).toBeHidden();
 
-    // Multiselección y botón Publicar deshabilitado hasta change 8
+    // Multiselección y botón Publicar habilitado (change 8)
     await page.getByLabel("Seleccionar Clip viral editado").click();
     await page.getByLabel("Seleccionar Clip viral #2").click();
     const actionBar = page.getByRole("region", {
@@ -163,7 +163,7 @@ test.describe("Detalle de proyecto y revisión de clips (/projects/[id])", () =>
     await expect(actionBar.getByText("de 2 seleccionados")).toBeVisible();
     await expect(
       actionBar.getByRole("button", { name: /Publicar en redes/i }),
-    ).toBeDisabled();
+    ).toBeEnabled();
 
     await actionBar.getByRole("button", { name: /Limpiar/i }).click();
     await expect(actionBar).toBeHidden();

@@ -11,7 +11,10 @@ import type {
   ClipUpdate,
   HealthResponse,
   JobOut,
+  PreviewMetaRequest,
   ProjectOut,
+  PublicationOut,
+  PublicationsCreateRequest,
   SocialAccountOut,
   SocialAccountUpdate,
   SubtitlePreset,
@@ -241,11 +244,73 @@ export function createSampleAccount(
   };
 }
 
+export function createSamplePublication(
+  overrides: Partial<PublicationOut> = {},
+): PublicationOut {
+  return {
+    id: "pub-e2e-1",
+    workspace_id: "ws-default",
+    clip_id: "clip-e2e-1",
+    project_id: "proj-e2e-1",
+    project_title: "Podcast Finanzas Personales",
+    clip_title: "El error que te cuesta 500 al mes",
+    clip_thumb_url: "/api/clips/clip-e2e-1/thumb",
+    account_id: "acc-e2e-1",
+    account_platform: "youtube",
+    account_auth_method: "api",
+    account_display_name: "HookVault",
+    account_handle: "@hookvault",
+    account_alias: "Canal Principal",
+    job_id: "job-pub-e2e-1",
+    job_progress: 0,
+    job_stage: "queued",
+    status: "scheduled",
+    delivery_mode: "direct",
+    scheduled_at: "2026-11-27T18:30:00Z",
+    published_at: null,
+    meta: {
+      title: "El error que te cuesta 500 al mes #Shorts",
+      description: "Descripción #Shorts",
+      caption: "",
+      hashtags: ["#Shorts"],
+      scheduled_at: "2026-11-27T18:30:00Z",
+      delivery_mode: "direct",
+      language: "es",
+      tags: ["Shorts"],
+      category_id: "22",
+      privacy_status: "public",
+      pinned_comment: null,
+      upload_thumbnail: true,
+      privacy_level: "PUBLIC_TO_EVERYONE",
+      disable_comment: false,
+      disable_duet: false,
+      disable_stitch: false,
+      share_to_feed: true,
+      thumb_offset_ms: null,
+      publication_id: null,
+      existing_external_id: null,
+      existing_external_url: null,
+    },
+    external_id: null,
+    external_url: null,
+    error: null,
+    error_code: null,
+    warnings: [],
+    has_screenshot: false,
+    screenshot_url: null,
+    attempts: 0,
+    created_at: "2026-11-26T10:00:00Z",
+    updated_at: "2026-11-26T10:00:00Z",
+    ...overrides,
+  };
+}
+
 export interface MockApiState {
   projects: ProjectOut[];
   clipsByProject: Record<string, ClipOut[]>;
   campaigns: CampaignOut[];
   accounts: SocialAccountOut[];
+  publications: PublicationOut[];
   accountsOAuthConfig: AccountsOAuthConfigOut;
   browserLoginStatuses: Record<string, "waiting" | "connected" | "cancelled">;
   campaignTemplates: CampaignTemplateOut[];
@@ -330,7 +395,12 @@ export async function setupMockApi(
   initial?: Partial<
     Pick<
       MockApiState,
-      "projects" | "clipsByProject" | "campaigns" | "accounts" | "failProjectsList"
+      | "projects"
+      | "clipsByProject"
+      | "campaigns"
+      | "accounts"
+      | "publications"
+      | "failProjectsList"
     >
   >,
 ): Promise<MockApiState> {
@@ -354,6 +424,7 @@ export async function setupMockApi(
     },
     campaigns: initial?.campaigns ?? [createSampleCampaign()],
     accounts: initial?.accounts ?? [],
+    publications: initial?.publications ?? [],
     accountsOAuthConfig: {
       platforms: [
         { platform: "youtube", configured: true, missing: [] },
@@ -486,6 +557,182 @@ export async function setupMockApi(
 
     if (pathname === "/api/presets" && method === "GET") {
       await route.fulfill({ json: state.presets });
+      return;
+    }
+
+    if (pathname === "/api/publications/quota" && method === "GET") {
+      const ytCount = state.publications.filter(
+        (p) =>
+          p.account_platform === "youtube" &&
+          p.account_auth_method === "api" &&
+          p.status !== "cancelled" &&
+          p.status !== "failed",
+      ).length;
+      await route.fulfill({
+        json: {
+          youtube_units_used: ytCount * 1600,
+          youtube_units_limit: 10000,
+          youtube_upload_cost: 1600,
+          youtube_uploads_today: ytCount,
+          accounts: state.accounts.map((a) => ({
+            account_id: a.id,
+            platform: a.platform,
+            auth_method: a.auth_method,
+            display_name: a.display_name,
+            handle: a.handle,
+            alias: a.alias ?? null,
+            used_today: 0,
+            daily_limit: a.auth_method === "playwright" ? 5 : 6,
+            remaining_today: a.auth_method === "playwright" ? 5 : 6,
+          })),
+        },
+      });
+      return;
+    }
+
+    if (pathname === "/api/publications/preview-meta" && method === "POST") {
+      const body = request.postDataJSON() as PreviewMetaRequest;
+      const items = body.clip_ids.flatMap((clipId) => {
+        const clip = Object.values(state.clipsByProject)
+          .flat()
+          .find((c) => c.id === clipId);
+        return body.account_ids.map((accountId) => {
+          const acc = state.accounts.find((a) => a.id === accountId);
+          const platform = acc?.platform ?? "youtube";
+          const authMethod = acc?.auth_method ?? "api";
+          const deliveryMode =
+            platform === "tiktok" &&
+            authMethod === "api" &&
+            !Boolean(acc?.capabilities?.direct_post)
+              ? "inbox"
+              : "direct";
+          return {
+            clip_id: clipId,
+            account_id: accountId,
+            platform,
+            auth_method: authMethod,
+            delivery_mode: deliveryMode,
+            meta: {
+              title: `${clip?.title ?? "Short"} #Shorts`.slice(0, 100),
+              description: `${clip?.description ?? ""} #Shorts`.trim(),
+              caption: `${clip?.title ?? ""} #shorts`.trim(),
+              hashtags: clip?.hashtags ?? ["#Shorts"],
+              scheduled_at: null,
+              delivery_mode: deliveryMode,
+              language: "es",
+              tags: ["Shorts"],
+              category_id: "22",
+              privacy_status: "public",
+              pinned_comment: null,
+              upload_thumbnail: true,
+              privacy_level: "PUBLIC_TO_EVERYONE",
+              disable_comment: false,
+              disable_duet: false,
+              disable_stitch: false,
+              share_to_feed: true,
+              thumb_offset_ms: null,
+              publication_id: null,
+              existing_external_id: null,
+              existing_external_url: null,
+            },
+            warnings: [],
+          };
+        });
+      });
+      await route.fulfill({
+        json: {
+          items,
+          warnings: [],
+          quota: {
+            youtube_units_used: 0,
+            youtube_units_limit: 10000,
+            youtube_upload_cost: 1600,
+            youtube_uploads_today: 0,
+            accounts: [],
+          },
+        },
+      });
+      return;
+    }
+
+    if (pathname === "/api/publications" && method === "GET") {
+      await route.fulfill({ json: state.publications });
+      return;
+    }
+
+    if (pathname === "/api/publications" && method === "POST") {
+      const body = request.postDataJSON() as PublicationsCreateRequest;
+      const created: PublicationOut[] = body.items.map((item, idx) => {
+        const clip = Object.values(state.clipsByProject)
+          .flat()
+          .find((c) => c.id === item.clip_id);
+        const acc = state.accounts.find((a) => a.id === item.account_id);
+        const proj = state.projects.find((p) => p.id === clip?.project_id);
+        return createSamplePublication({
+          id: `pub-e2e-${state.publications.length + idx + 1}`,
+          clip_id: item.clip_id,
+          project_id: clip?.project_id ?? "proj-e2e-1",
+          project_title: proj?.title ?? "Proyecto",
+          clip_title: clip?.title ?? "Clip",
+          clip_thumb_url: clip?.thumb_url ?? null,
+          account_id: item.account_id,
+          account_platform: acc?.platform ?? "youtube",
+          account_auth_method: acc?.auth_method ?? "api",
+          account_display_name: acc?.display_name ?? "Cuenta",
+          account_handle: acc?.handle ?? "@cuenta",
+          account_alias: acc?.alias ?? null,
+          status: "scheduled",
+          delivery_mode: item.meta.delivery_mode ?? "direct",
+          scheduled_at: item.scheduled_at ?? null,
+          meta: item.meta,
+        });
+      });
+      state.publications = [...created, ...state.publications];
+      await route.fulfill({ status: 201, json: created });
+      return;
+    }
+
+    const pubShotMatch = pathname.match(/^\/api\/publications\/([^/]+)\/screenshot$/);
+    if (pubShotMatch && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: TINY_PNG,
+      });
+      return;
+    }
+
+    const pubRetryMatch = pathname.match(/^\/api\/publications\/([^/]+)\/retry$/);
+    if (pubRetryMatch && method === "POST") {
+      const pubId = pubRetryMatch[1]!;
+      let updated: PublicationOut | undefined;
+      state.publications = state.publications.map((p) => {
+        if (p.id !== pubId) return p;
+        updated = { ...p, status: "scheduled", error: null, error_code: null };
+        return updated;
+      });
+      if (!updated) {
+        await route.fulfill({ status: 404, json: { detail: "No encontrada" } });
+        return;
+      }
+      await route.fulfill({ json: updated });
+      return;
+    }
+
+    const pubCancelMatch = pathname.match(/^\/api\/publications\/([^/]+)\/cancel$/);
+    if (pubCancelMatch && method === "POST") {
+      const pubId = pubCancelMatch[1]!;
+      let updated: PublicationOut | undefined;
+      state.publications = state.publications.map((p) => {
+        if (p.id !== pubId) return p;
+        updated = { ...p, status: "cancelled" };
+        return updated;
+      });
+      if (!updated) {
+        await route.fulfill({ status: 404, json: { detail: "No encontrada" } });
+        return;
+      }
+      await route.fulfill({ json: updated });
       return;
     }
 

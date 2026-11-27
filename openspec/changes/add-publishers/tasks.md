@@ -25,12 +25,12 @@
 
 ## 5. Interfaz web: diálogo "Publicar" y página `/publications`
 
-- [ ] 5.1 Implementar el diálogo "Publicar" en `apps/web` e integrarlo en `/projects/[id]` (desde una card individual y mediante multi-selección de clips renderizados): selección de cuentas agrupadas por plataforma (con preselección de cuentas por defecto), pestañas de metadatos editables por plataforma con contadores de caracteres, avisos de cuota/inbox/ToS Playwright y selector de publicación inmediata o programada. Verificar con `pnpm --filter web lint && pnpm --filter web build` y prueba manual contra la API local.
-- [ ] 5.2 Implementar la página `/publications` en `apps/web`: listado filtrable por plataforma, cuenta, estado y proyecto, actualizaciones de estado en tiempo real vía SSE, enlace externo clickable, detalle de error con modal visor de captura de pantalla, botón "Reintentar" en fallidas y "Cancelar" en programadas. Verificar manualmente el ciclo completo (encolar, ver progreso SSE, inspeccionar error con captura, reintentar y cancelar programada).
+- [x] 5.1 Implementar el diálogo "Publicar" en `apps/web` e integrarlo en `/projects/[id]` (desde una card individual y mediante multi-selección de clips renderizados): selección de cuentas agrupadas por plataforma (con preselección de cuentas por defecto), pestañas de metadatos editables por plataforma con contadores de caracteres, avisos de cuota/inbox/ToS Playwright y selector de publicación inmediata o programada. Verificar con `pnpm --filter web lint && pnpm --filter web build` y prueba manual contra la API local.
+- [x] 5.2 Implementar la página `/publications` en `apps/web`: listado filtrable por plataforma, cuenta, estado y proyecto, actualizaciones de estado en tiempo real vía SSE, enlace externo clickable, detalle de error con modal visor de captura de pantalla, botón "Reintentar" en fallidas y "Cancelar" en programadas. Verificar manualmente el ciclo completo (encolar, ver progreso SSE, inspeccionar error con captura, reintentar y cancelar programada).
 
 ## 6. Verificación integrada
 
-- [ ] 6.1 Ejecutar `uv run --project apps/api ruff check . && uv run --project apps/api ruff format --check . && uv run --project apps/api pytest`, `pnpm --filter web lint && pnpm --filter web build`, verificar un flujo integrado en modo prueba (diálogo Publicar multi-cuenta → worker `publish` → seguimiento en `/publications`) y ejecutar `openspec validate add-publishers --strict` sin errores.
+- [x] 6.1 Ejecutar `uv run --project apps/api ruff check . && uv run --project apps/api ruff format --check . && uv run --project apps/api pytest`, `pnpm --filter web lint && pnpm --filter web build`, verificar un flujo integrado en modo prueba (diálogo Publicar multi-cuenta → worker `publish` → seguimiento en `/publications`) y ejecutar `openspec validate add-publishers --strict` sin errores.
 
 ## Workflow follow-up
 

@@ -3,18 +3,14 @@
 import { CheckSquare, Send, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 export interface SelectionActionBarProps {
   selectedCount: number;
   total: number;
   onSelectAll: () => void;
   onClear: () => void;
+  onPublish: () => void;
+  publishDisabled?: boolean;
 }
 
 export function SelectionActionBar({
@@ -22,6 +18,8 @@ export function SelectionActionBar({
   total,
   onSelectAll,
   onClear,
+  onPublish,
+  publishDisabled = false,
 }: SelectionActionBarProps) {
   if (selectedCount === 0) return null;
 
@@ -50,28 +48,16 @@ export function SelectionActionBar({
         Limpiar
       </Button>
 
-      <TooltipProvider delayDuration={150}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={0} className="inline-flex">
-              <Button
-                type="button"
-                size="sm"
-                disabled
-                aria-disabled="true"
-                className="pointer-events-none"
-              >
-                <Send aria-hidden="true" />
-                Publicar en redes →
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            La publicación multi-red llega en el change 8, cuando existan cuentas
-            conectadas y publishers.
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Button
+        type="button"
+        size="sm"
+        disabled={publishDisabled}
+        onClick={onPublish}
+        className="bg-amber-400 font-semibold text-zinc-950 hover:bg-amber-300"
+      >
+        <Send aria-hidden="true" />
+        Publicar en redes →
+      </Button>
     </div>
   );
 }

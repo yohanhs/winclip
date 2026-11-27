@@ -58,6 +58,19 @@ export type TokenImportRequest = Components["schemas"]["TokenImportRequest"];
 export type AccountPlatform = SocialAccountOut["platform"];
 export type AccountAuthMethod = SocialAccountOut["auth_method"];
 export type AccountStatus = SocialAccountOut["status"];
+export type PublishMeta = Components["schemas"]["PublishMeta"];
+export type PublicationOut = Components["schemas"]["PublicationOut"];
+export type PublicationDetailOut = Components["schemas"]["PublicationDetailOut"];
+export type PublicationStatus = PublicationOut["status"];
+export type DeliveryMode = PublicationOut["delivery_mode"];
+export type PreviewMetaRequest = Components["schemas"]["PreviewMetaRequest"];
+export type PreviewMetaItemOut = Components["schemas"]["PreviewMetaItemOut"];
+export type PreviewMetaOut = Components["schemas"]["PreviewMetaOut"];
+export type PublicationCreateItem = Components["schemas"]["PublicationCreateItem"];
+export type PublicationsCreateRequest = Components["schemas"]["PublicationsCreateRequest"];
+export type PublicationCancelRequest = Components["schemas"]["PublicationCancelRequest"];
+export type AccountQuotaOut = Components["schemas"]["AccountQuotaOut"];
+export type QuotaSummaryOut = Components["schemas"]["QuotaSummaryOut"];
 
 /** Evento SSE tal y como lo entrega `GET /api/events`. */
 export interface SseEvent {
@@ -99,4 +112,22 @@ export interface SseClipReady {
   status: "rendered";
   thumb_url?: string | null;
   video_url?: string | null;
+}
+
+export interface SsePublicationUpdated {
+  publication_id: string;
+  clip_id: string;
+  account_id: string;
+  project_id: string | null;
+  job_id: string | null;
+  status: PublicationStatus;
+  delivery_mode: DeliveryMode;
+  external_id?: string | null;
+  external_url?: string | null;
+  error?: string | null;
+  error_code?: string | null;
+  warnings?: string[];
+  has_screenshot?: boolean;
+  progress?: number;
+  stage?: string;
 }
