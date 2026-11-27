@@ -6,9 +6,10 @@ palabra a palabra, siguiendo las reglas de una campaña, los revisa en una web y
 de YouTube, TikTok e Instagram ya configuradas.
 
 > Estado: **pipeline local completo, API/cola SSE, reglas de campaña (`/campaigns`), gestión de cuentas
-> sociales (`/accounts`), publicación y programación multi-cuenta (`/publications`) e interfaz web de
-> proyectos y revisión de clips 9:16**. Los controles avanzados de edición (`add-clip-editor-controls`)
-> llegan en el siguiente change de OpenSpec.
+> sociales (`/accounts`), publicación y programación multi-cuenta (`/publications`), interfaz web de
+> proyectos y revisión de clips 9:16 con controles avanzados de edición por clip** (corrección inline de
+> palabras de subtítulos sin alterar `transcript.json`, override de preset y modo de reencuadre, y
+> ajuste manual de `crop_x`/`crop_y`/`zoom` en modo `center`).
 
 ## Requisitos
 
