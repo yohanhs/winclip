@@ -39,6 +39,8 @@ class PromptTemplate:
     @property
     def logical_model(self) -> str:
         """Identificador lógico para la caché, p. ej. `clip-selection:single:v1`."""
+        if self.name == "parse_campaign":
+            return f"campaign-parser:v{self.version}"
         kind = _KIND_BY_PROMPT.get(self.name, self.name)
         return f"clip-selection:{kind}:v{self.version}"
 

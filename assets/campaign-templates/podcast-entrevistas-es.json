@@ -1,0 +1,49 @@
+{
+  "id": "podcast-entrevistas-es",
+  "title": "Podcast y Entrevistas (ES)",
+  "description": "Clips dinámicos de entrevistas y podcasts en español con historias completas, ganchos rápidos y sin menciones de patrocinadores.",
+  "language": "es",
+  "rules": {
+    "name": "Podcast & Entrevistas ES",
+    "language": "es",
+    "min_duration": 25,
+    "max_duration": 65,
+    "max_clips": 10,
+    "priority_topics": [
+      "anécdotas personales",
+      "consejos accionables",
+      "opiniones contraintuitivas",
+      "errores y aprendizajes"
+    ],
+    "banned_topics": [
+      "lectura de patrocinadores",
+      "saludos iniciales largos",
+      "política partidista"
+    ],
+    "banned_words": [
+      "patrocinado por",
+      "código de descuento",
+      "garantizado"
+    ],
+    "required_keywords": [
+      "podcast"
+    ],
+    "tone": "directo, cercano y con ritmo",
+    "hook_max_seconds": 3,
+    "cta_text": "Episodio completo en el canal",
+    "hashtags": [
+      "#podcast",
+      "#entrevista",
+      "#shorts",
+      "#clips"
+    ],
+    "subtitle_preset": "bold-yellow",
+    "watermark_path": null,
+    "target_platforms": [
+      "youtube",
+      "tiktok",
+      "instagram"
+    ],
+    "extra_instructions": "Prioriza momentos donde el invitado cierre una idea completa con remate claro y evita cortes a mitad de risa o frase."
+  }
+}

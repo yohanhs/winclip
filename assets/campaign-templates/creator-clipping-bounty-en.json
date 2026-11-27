@@ -1,0 +1,49 @@
+{
+  "id": "creator-clipping-bounty-en",
+  "title": "Creator Clipping Bounty (EN)",
+  "description": "High-retention creator bounty campaign in English for Shorts, Reels, and TikTok with punchy hooks and strict brand-safety rules.",
+  "language": "en",
+  "rules": {
+    "name": "Creator Clipping Bounty EN",
+    "language": "en",
+    "min_duration": 18,
+    "max_duration": 58,
+    "max_clips": 12,
+    "priority_topics": [
+      "high-energy reactions",
+      "hot takes",
+      "behind-the-scenes stories",
+      "viral moments"
+    ],
+    "banned_topics": [
+      "drama without context",
+      "brand disses",
+      "gambling promotions"
+    ],
+    "banned_words": [
+      "guaranteed money",
+      "scam",
+      "click the shady link"
+    ],
+    "required_keywords": [
+      "creator"
+    ],
+    "tone": "punchy, fast-paced, and curiosity-driven",
+    "hook_max_seconds": 3,
+    "cta_text": "Watch the full episode on YouTube",
+    "hashtags": [
+      "#shorts",
+      "#clips",
+      "#creator",
+      "#viral"
+    ],
+    "subtitle_preset": "mrbeast",
+    "watermark_path": null,
+    "target_platforms": [
+      "youtube",
+      "tiktok",
+      "instagram"
+    ],
+    "extra_instructions": "Open immediately with the most surprising statement or tension point. Avoid slow intros or dead air."
+  }
+}

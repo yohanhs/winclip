@@ -1,0 +1,48 @@
+{
+  "id": "finanzas-educativo-es",
+  "title": "Finanzas y Educación (ES)",
+  "description": "Campaña educativa de finanzas personales e inversión en español con cumplimiento estricto anti-promesas y estilo Hormozi.",
+  "language": "es",
+  "rules": {
+    "name": "Finanzas Educativo ES",
+    "language": "es",
+    "min_duration": 20,
+    "max_duration": 55,
+    "max_clips": 8,
+    "priority_topics": [
+      "interés compuesto",
+      "errores financieros comunes",
+      "ahorro e inversión a largo plazo",
+      "hábitos de dinero"
+    ],
+    "banned_topics": [
+      "promesas de rentabilidad asegurada",
+      "esquemas piramidales",
+      "asesoría fiscal personalizada"
+    ],
+    "banned_words": [
+      "dinero fácil",
+      "rentabilidad garantizada",
+      "hazte rico rápido",
+      "sin riesgo"
+    ],
+    "required_keywords": [
+      "inversión"
+    ],
+    "tone": "educativo, claro y basado en datos",
+    "hook_max_seconds": 3,
+    "cta_text": "Guarda este clip y síguenos para más finanzas",
+    "hashtags": [
+      "#finanzaspersonales",
+      "#inversion",
+      "#educacionfinanciera"
+    ],
+    "subtitle_preset": "hormozi",
+    "watermark_path": null,
+    "target_platforms": [
+      "youtube",
+      "instagram"
+    ],
+    "extra_instructions": "Incluye cifras concretas cuando aparezcan en la transcripción y mantén un enfoque divulgativo, nunca como recomendación financiera."
+  }
+}

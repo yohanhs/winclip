@@ -1,0 +1,48 @@
+{
+  "id": "saas-tech-demo-en",
+  "title": "SaaS & Tech Demo Clipping (EN)",
+  "description": "Product demos, founder interviews, and AI/SaaS breakdowns in English with clean subtitles and clear call-to-action.",
+  "language": "en",
+  "rules": {
+    "name": "SaaS & Tech Demo EN",
+    "language": "en",
+    "min_duration": 22,
+    "max_duration": 60,
+    "max_clips": 8,
+    "priority_topics": [
+      "product workflow demos",
+      "time-saving automations",
+      "founder lessons",
+      "customer ROI"
+    ],
+    "banned_topics": [
+      "unreleased internal pricing",
+      "competitor bashing"
+    ],
+    "banned_words": [
+      "100% bug-free",
+      "magic button",
+      "get rich quick"
+    ],
+    "required_keywords": [
+      "workflow"
+    ],
+    "tone": "crisp, authoritative, and practical",
+    "hook_max_seconds": 3,
+    "cta_text": "Try it free — link in bio",
+    "hashtags": [
+      "#saas",
+      "#ai",
+      "#productivity",
+      "#tech"
+    ],
+    "subtitle_preset": "clean-white",
+    "watermark_path": null,
+    "target_platforms": [
+      "youtube",
+      "tiktok",
+      "instagram"
+    ],
+    "extra_instructions": "Focus on concrete before/after workflow improvements and clear feature payoffs."
+  }
+}
