@@ -1,12 +1,26 @@
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig, devices } from "@playwright/test";
+import { chromium, defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const hasProductionBuild = fs.existsSync(
   path.join(__dirname, ".next", "BUILD_ID"),
 );
+const systemChromePath =
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const hasBundledChromium = (() => {
+  try {
+    return fs.existsSync(chromium.executablePath());
+  } catch {
+    return false;
+  }
+})();
+const useSystemChrome =
+  !process.env.CI &&
+  process.platform === "darwin" &&
+  !hasBundledChromium &&
+  fs.existsSync(systemChromePath);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -22,7 +36,10 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        ...(useSystemChrome ? { channel: "chrome" } : {}),
+      },
     },
   ],
   webServer: {

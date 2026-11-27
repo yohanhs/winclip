@@ -183,4 +183,13 @@ export const mswHandlers = [
   http.get("/api/presets", () => {
     return HttpResponse.json(mockPresets);
   }),
+
+  // Campaigns
+  http.get("/api/campaigns", () => {
+    return HttpResponse.json([]);
+  }),
+
+  http.get("/api/campaigns/templates", () => {
+    return HttpResponse.json([]);
+  }),
 ];

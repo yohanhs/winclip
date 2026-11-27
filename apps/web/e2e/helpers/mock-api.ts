@@ -1,5 +1,10 @@
 import type { Page } from "@playwright/test";
 import type {
+  CampaignCreate,
+  CampaignOut,
+  CampaignParseOut,
+  CampaignTemplateOut,
+  CampaignUpdate,
   ClipOut,
   ClipUpdate,
   HealthResponse,
@@ -119,9 +124,99 @@ export const DEFAULT_HEALTH: HealthResponse = {
   ],
 };
 
+export const DEFAULT_CAMPAIGN_TEMPLATES: CampaignTemplateOut[] = [
+  {
+    id: "podcast-entrevistas-es",
+    title: "Podcast y Entrevistas (ES)",
+    description: "Clips dinámicos en español con ganchos rápidos.",
+    language: "es",
+    rules: {
+      name: "Podcast & Entrevistas ES",
+      language: "es",
+      min_duration: 25,
+      max_duration: 65,
+      max_clips: 10,
+      priority_topics: ["anécdotas"],
+      banned_topics: ["patrocinadores"],
+      banned_words: ["garantizado"],
+      required_keywords: ["podcast"],
+      tone: "directo y cercano",
+      hook_max_seconds: 3,
+      cta_text: "Episodio completo en el canal",
+      hashtags: ["#podcast", "#shorts"],
+      subtitle_preset: "bold-yellow",
+      watermark_path: null,
+      target_platforms: ["youtube", "tiktok"],
+      extra_instructions: "Cierra ideas completas.",
+    },
+  },
+  {
+    id: "creator-clipping-bounty-en",
+    title: "Creator Clipping Bounty (EN)",
+    description: "High-retention creator clips in English.",
+    language: "en",
+    rules: {
+      name: "Creator Clipping Bounty EN",
+      language: "en",
+      min_duration: 18,
+      max_duration: 58,
+      max_clips: 12,
+      priority_topics: ["viral moments"],
+      banned_topics: ["gambling"],
+      banned_words: ["scam"],
+      required_keywords: ["creator"],
+      tone: "punchy and fast",
+      hook_max_seconds: 3,
+      cta_text: "Watch full episode",
+      hashtags: ["#shorts", "#creator"],
+      subtitle_preset: "mrbeast",
+      watermark_path: null,
+      target_platforms: ["youtube", "tiktok", "instagram"],
+      extra_instructions: "Open with tension.",
+    },
+  },
+];
+
+export function createSampleCampaign(
+  overrides: Partial<CampaignOut> = {},
+): CampaignOut {
+  return {
+    id: "camp-e2e-1",
+    workspace_id: "ws-default",
+    name: "Finanzas Educativo ES",
+    rules: {
+      name: "Finanzas Educativo ES",
+      language: "es",
+      min_duration: 20,
+      max_duration: 55,
+      max_clips: 7,
+      priority_topics: ["ahorro", "inversión"],
+      banned_topics: ["cripto"],
+      banned_words: ["garantizado"],
+      required_keywords: ["inversión"],
+      tone: "educativo",
+      hook_max_seconds: 3,
+      cta_text: "Suscríbete al canal",
+      hashtags: ["#finanzas", "#shorts"],
+      subtitle_preset: "hormozi",
+      watermark_path: null,
+      target_platforms: ["youtube", "tiktok"],
+      extra_instructions: "Sin relleno.",
+    },
+    source_text: "Brief original",
+    projects_count: 1,
+    created_at: "2026-11-26T09:00:00Z",
+    updated_at: "2026-11-26T09:30:00Z",
+    ...overrides,
+  };
+}
+
 export interface MockApiState {
   projects: ProjectOut[];
   clipsByProject: Record<string, ClipOut[]>;
+  campaigns: CampaignOut[];
+  campaignTemplates: CampaignTemplateOut[];
+  parseResponse: CampaignParseOut;
   presets: SubtitlePreset[];
   health: HealthResponse;
   failProjectsList: boolean;
@@ -142,6 +237,7 @@ export function createSampleProject(
     id: "proj-e2e-1",
     workspace_id: "ws-default",
     campaign_id: null,
+    campaign_name: null,
     source_type: "url",
     source_url: "https://www.youtube.com/watch?v=demo123",
     title: "Podcast Finanzas Personales",
@@ -185,6 +281,7 @@ export function createSampleClip(overrides: Partial<ClipOut> = {}): ClipOut {
     duration: 45,
     video_url: "/api/clips/clip-e2e-1/file",
     thumb_url: "/api/clips/clip-e2e-1/thumb",
+    rule_violations: [],
     created_at: "2026-11-26T10:04:00Z",
     updated_at: "2026-11-26T10:05:00Z",
     ...overrides,
@@ -197,7 +294,12 @@ export function createSampleClip(overrides: Partial<ClipOut> = {}): ClipOut {
  */
 export async function setupMockApi(
   page: Page,
-  initial?: Partial<Pick<MockApiState, "projects" | "clipsByProject" | "failProjectsList">>,
+  initial?: Partial<
+    Pick<
+      MockApiState,
+      "projects" | "clipsByProject" | "campaigns" | "failProjectsList"
+    >
+  >,
 ): Promise<MockApiState> {
   const state: MockApiState = {
     projects: initial?.projects ?? [createSampleProject()],
@@ -216,6 +318,32 @@ export async function setupMockApi(
           thumb_url: "/api/clips/clip-e2e-2/thumb",
         }),
       ],
+    },
+    campaigns: initial?.campaigns ?? [createSampleCampaign()],
+    campaignTemplates: DEFAULT_CAMPAIGN_TEMPLATES,
+    parseResponse: {
+      rules: {
+        name: "Campaña desde Brief IA",
+        language: "es",
+        min_duration: 22,
+        max_duration: 50,
+        max_clips: 6,
+        priority_topics: ["ahorro"],
+        banned_topics: [],
+        banned_words: ["garantizado"],
+        required_keywords: ["inversión"],
+        tone: "directo",
+        hook_max_seconds: 3,
+        cta_text: "Suscríbete hoy",
+        hashtags: ["#finanzas", "#shorts"],
+        subtitle_preset: "hormozi",
+        watermark_path: null,
+        target_platforms: ["youtube", "tiktok"],
+        extra_instructions: null,
+      },
+      inferred_fields: ["tone", "subtitle_preset"],
+      warnings: [],
+      provider: "fake:gemini-flash",
     },
     presets: DEFAULT_PRESETS,
     health: DEFAULT_HEALTH,
@@ -311,6 +439,121 @@ export async function setupMockApi(
       return;
     }
 
+    if (pathname === "/api/campaigns" && method === "GET") {
+      await route.fulfill({ json: state.campaigns });
+      return;
+    }
+
+    if (pathname === "/api/campaigns/templates" && method === "GET") {
+      await route.fulfill({ json: state.campaignTemplates });
+      return;
+    }
+
+    if (pathname === "/api/campaigns/parse" && method === "POST") {
+      await route.fulfill({ json: state.parseResponse });
+      return;
+    }
+
+    if (pathname === "/api/campaigns/watermarks" && method === "POST") {
+      await route.fulfill({
+        status: 201,
+        json: { watermark_path: "campaigns/watermarks/01e2ewm.png" },
+      });
+      return;
+    }
+
+    if (pathname.startsWith("/api/campaigns/watermarks/") && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: TINY_PNG,
+      });
+      return;
+    }
+
+    if (pathname === "/api/campaigns" && method === "POST") {
+      const body = request.postDataJSON() as CampaignCreate;
+      const created: CampaignOut = {
+        id: `camp-e2e-${state.campaigns.length + 1}`,
+        workspace_id: "ws-default",
+        name: body.name,
+        rules: { ...body.rules, name: body.name },
+        source_text: body.source_text ?? null,
+        projects_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      state.campaigns = [created, ...state.campaigns];
+      await route.fulfill({ status: 201, json: created });
+      return;
+    }
+
+    const campDupMatch = pathname.match(/^\/api\/campaigns\/([^/]+)\/duplicate$/);
+    if (campDupMatch && method === "POST") {
+      const source = state.campaigns.find((c) => c.id === campDupMatch[1]);
+      if (!source) {
+        await route.fulfill({ status: 404, json: { detail: "No encontrada" } });
+        return;
+      }
+      const copy: CampaignOut = {
+        ...source,
+        id: `camp-copy-${state.campaigns.length + 1}`,
+        name: `${source.name} (copia)`,
+        rules: { ...source.rules, name: `${source.name} (copia)` },
+        projects_count: 0,
+        updated_at: new Date().toISOString(),
+      };
+      state.campaigns = [copy, ...state.campaigns];
+      await route.fulfill({ status: 201, json: copy });
+      return;
+    }
+
+    const campMatch = pathname.match(/^\/api\/campaigns\/([^/]+)$/);
+    if (campMatch) {
+      const campId = campMatch[1]!;
+      if (method === "GET") {
+        const found = state.campaigns.find((c) => c.id === campId);
+        if (!found) {
+          await route.fulfill({ status: 404, json: { detail: "No encontrada" } });
+          return;
+        }
+        await route.fulfill({ json: found });
+        return;
+      }
+      if (method === "PATCH") {
+        const body = request.postDataJSON() as CampaignUpdate;
+        const found = state.campaigns.find((c) => c.id === campId);
+        if (!found) {
+          await route.fulfill({ status: 404, json: { detail: "No encontrada" } });
+          return;
+        }
+        const nextName = body.name ?? found.name;
+        const updated: CampaignOut = {
+          ...found,
+          name: nextName,
+          rules: body.rules ? { ...body.rules, name: nextName } : found.rules,
+          source_text:
+            body.source_text !== undefined ? body.source_text : found.source_text,
+          updated_at: new Date().toISOString(),
+        };
+        state.campaigns = state.campaigns.map((c) =>
+          c.id === campId ? updated : c,
+        );
+        await route.fulfill({ json: updated });
+        return;
+      }
+      if (method === "DELETE") {
+        state.campaigns = state.campaigns.filter((c) => c.id !== campId);
+        state.projects = state.projects.map((p) =>
+          p.campaign_id === campId
+            ? { ...p, campaign_id: null, campaign_name: null }
+            : p,
+        );
+        await route.fulfill({ status: 204 });
+        return;
+      }
+    }
+
     if (pathname === "/api/projects" && method === "GET") {
       if (state.failProjectsList) {
         await route.fulfill({
@@ -332,6 +575,7 @@ export async function setupMockApi(
       let sourceType = "url";
       let sourceUrl: string | null = null;
       let requestedClips: number | null = 5;
+      let campaignId: string | null = null;
 
       if (contentType.includes("application/json")) {
         const parsed = request.postDataJSON() as Record<string, unknown>;
@@ -356,6 +600,8 @@ export async function setupMockApi(
           typeof parsed.requested_clips === "number"
             ? parsed.requested_clips
             : null;
+        campaignId =
+          typeof parsed.campaign_id === "string" ? parsed.campaign_id : null;
       } else {
         const raw = request.postData() ?? "";
         state.createdPayloads.push({ contentType, body: raw });
@@ -377,8 +623,13 @@ export async function setupMockApi(
         created_at: "2026-11-26T11:00:00Z",
         updated_at: "2026-11-26T11:00:00Z",
       };
+      const matchedCampaign = campaignId
+        ? state.campaigns.find((c) => c.id === campaignId) ?? null
+        : null;
       const project = createSampleProject({
         id: newId,
+        campaign_id: campaignId,
+        campaign_name: matchedCampaign?.name ?? null,
         title: createdTitle,
         source_type: sourceType,
         source_url: sourceUrl,

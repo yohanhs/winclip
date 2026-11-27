@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   Download,
   Loader2,
   Pencil,
@@ -65,6 +66,8 @@ export function ClipCard({
   const video = mediaUrl(clip.video_url, clip.updated_at);
   const isRendering = clip.status === "rendering" || clip.status === "pending";
   const isReady = clip.status === "rendered" || clip.status === "ready";
+  const violations = clip.rule_violations ?? [];
+  const hasErrorViolation = violations.some((v) => v.severity === "error");
 
   const startHover = () => {
     setHovering(true);
@@ -162,6 +165,22 @@ export function ClipCard({
           >
             {Math.round(clip.score)}/100
           </Badge>
+          {violations.length > 0 ? (
+            <Badge
+              variant="outline"
+              data-testid={`clip-violations-badge-${clip.id}`}
+              className={cn(
+                "gap-1 font-mono text-[10px] tabular-nums",
+                hasErrorViolation
+                  ? "border-rose-500/45 bg-rose-500/20 text-rose-200"
+                  : "border-amber-400/45 bg-amber-500/20 text-amber-200",
+              )}
+            >
+              <AlertTriangle className="size-3" aria-hidden="true" />
+              {violations.length}{" "}
+              {violations.length === 1 ? "alerta" : "alertas"}
+            </Badge>
+          ) : null}
         </div>
 
         <div className="absolute right-2 top-2 z-20">
@@ -197,6 +216,36 @@ export function ClipCard({
               .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`))
               .join(" ")}
           </p>
+        ) : null}
+
+        {violations.length > 0 ? (
+          <div
+            data-testid={`clip-violations-${clip.id}`}
+            className={cn(
+              "space-y-1 rounded-md border px-2.5 py-2 text-[11px]",
+              hasErrorViolation
+                ? "border-rose-500/35 bg-rose-500/10 text-rose-200"
+                : "border-amber-400/30 bg-amber-500/10 text-amber-200",
+            )}
+          >
+            {violations.map((violation, index) => (
+              <div
+                key={`${violation.code}-${index}`}
+                className="flex items-start gap-1.5 leading-snug"
+              >
+                <AlertTriangle
+                  className={cn(
+                    "mt-0.5 size-3 shrink-0",
+                    violation.severity === "error"
+                      ? "text-rose-400"
+                      : "text-amber-400",
+                  )}
+                  aria-hidden="true"
+                />
+                <span>{violation.message}</span>
+              </div>
+            ))}
+          </div>
         ) : null}
 
         <div className="mt-auto flex items-center justify-between gap-1 border-t border-white/5 pt-2">

@@ -1,13 +1,16 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Calendar,
   ExternalLink,
   Globe,
   Loader2,
+  Megaphone,
   RefreshCw,
   Video,
 } from "lucide-react";
@@ -31,9 +34,23 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const clipsQuery = useProjectClips(projectId);
   const cancelJob = useCancelJob(projectId);
   const { connected } = useProjectEvents(projectId);
+  const [clipFilter, setClipFilter] = useState<"all" | "alerts">("all");
 
   const project = projectQuery.data;
   const job = project?.active_job ?? project?.latest_job ?? null;
+  const allClips = useMemo(() => clipsQuery.data ?? [], [clipsQuery.data]);
+  const alertsCount = useMemo(
+    () =>
+      allClips.filter((clip) => (clip.rule_violations?.length ?? 0) > 0).length,
+    [allClips],
+  );
+  const visibleClips = useMemo(
+    () =>
+      clipFilter === "alerts"
+        ? allClips.filter((clip) => (clip.rule_violations?.length ?? 0) > 0)
+        : allClips,
+    [allClips, clipFilter],
+  );
 
   if (projectQuery.isLoading) {
     return (
@@ -134,10 +151,55 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
               <span>{formatDuration(project.duration)}</span>
               <span>{project.clips_count} clips</span>
               <span className="font-mono uppercase">{project.subtitle_preset}</span>
+              {project.campaign_name ? (
+                <Link
+                  href="/campaigns"
+                  className="inline-flex items-center gap-1 rounded bg-amber-400/12 px-1.5 py-0.5 text-amber-300 hover:bg-amber-400/20"
+                >
+                  <Megaphone className="size-3" aria-hidden="true" />
+                  <span>{project.campaign_name}</span>
+                </Link>
+              ) : null}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              role="group"
+              aria-label="Filtrar clips"
+              className="inline-flex rounded-md border border-white/10 bg-[#0D0D10] p-0.5 text-xs"
+            >
+              <button
+                type="button"
+                onClick={() => setClipFilter("all")}
+                aria-pressed={clipFilter === "all"}
+                className={cn(
+                  "cursor-pointer rounded px-2.5 py-1 font-medium transition-colors",
+                  clipFilter === "all"
+                    ? "bg-white/10 text-zinc-100"
+                    : "text-zinc-400 hover:text-zinc-200",
+                )}
+              >
+                Todos ({allClips.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setClipFilter("alerts")}
+                aria-pressed={clipFilter === "alerts"}
+                className={cn(
+                  "inline-flex cursor-pointer items-center gap-1 rounded px-2.5 py-1 font-medium transition-colors",
+                  clipFilter === "alerts"
+                    ? "bg-amber-400/15 text-amber-300"
+                    : "text-zinc-400 hover:text-zinc-200",
+                )}
+              >
+                <AlertTriangle className="size-3" aria-hidden="true" />
+                <span>Alertas</span>
+                <span className="font-mono text-[11px] tabular-nums">
+                  ({alertsCount})
+                </span>
+              </button>
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -211,7 +273,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
 
       <ClipGrid
         projectId={project.id}
-        clips={clipsQuery.data ?? []}
+        clips={visibleClips}
         projectDuration={project.duration}
         isLoading={clipsQuery.isLoading}
       />

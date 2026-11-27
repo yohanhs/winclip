@@ -40,6 +40,42 @@ vi.mock("@/hooks/use-projects", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-campaigns", () => ({
+  useCampaigns: () => ({
+    data: [
+      {
+        id: "camp-1",
+        workspace_id: "ws-1",
+        name: "Finanzas ES",
+        rules: {
+          name: "Finanzas ES",
+          language: "es",
+          min_duration: 20,
+          max_duration: 55,
+          max_clips: 7,
+          priority_topics: [],
+          banned_topics: [],
+          banned_words: ["garantizado"],
+          required_keywords: [],
+          tone: null,
+          hook_max_seconds: 3,
+          cta_text: null,
+          hashtags: ["#finanzas"],
+          subtitle_preset: "hormozi",
+          watermark_path: null,
+          target_platforms: ["youtube"],
+          extra_instructions: null,
+        },
+        source_text: null,
+        projects_count: 0,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     error: mocks.toastError,
@@ -129,11 +165,22 @@ describe("ProjectCreateForm", () => {
     expect(variables.input.requested_clips).toBe("max");
   });
 
-  it("mantiene la campaña visible pero deshabilitada", () => {
+  it("habilita el selector de campaña y pre-rellena clips, idioma y preset", () => {
     render(<ProjectCreateForm />);
     const selects = screen.getAllByRole("combobox");
     expect(selects).toHaveLength(3);
-    expect(selects[2]).toBeDisabled();
+    const campaignSelect = selects[2]!;
+    expect(campaignSelect).not.toBeDisabled();
+
+    fireEvent.change(campaignSelect, { target: { value: "camp-1" } });
+    fillUrl("https://example.com/video.mp4");
+    submit();
+
+    const [variables] = mocks.mutate.mock.calls[0]!;
+    expect(variables.input.campaign_id).toBe("camp-1");
+    expect(variables.input.requested_clips).toBe(7);
+    expect(variables.input.language).toBe("es");
+    expect(variables.input.subtitle_preset).toBe("hormozi");
   });
 
   it("valida la URL antes de llamar a la API", () => {

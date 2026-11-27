@@ -30,6 +30,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCampaigns } from "@/hooks/use-campaigns";
 import { useCreateProject, usePresets } from "@/hooks/use-projects";
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -103,6 +104,7 @@ export function ProjectCreateForm() {
   const router = useRouter();
   const createProject = useCreateProject();
   const presetsQuery = usePresets();
+  const campaignsQuery = useCampaigns();
 
   const [sourceType, setSourceType] = useState<SourceType>("url");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -113,9 +115,42 @@ export function ProjectCreateForm() {
   const [language, setLanguage] = useState<Language>("auto");
   const [preset, setPreset] = useState<string>("bold-yellow");
   const [reframeMode, setReframeMode] = useState<ReframeMode>("face");
+  const [campaignId, setCampaignId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [urlError, setUrlError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const campaigns = campaignsQuery.data ?? [];
+  const selectedCampaign =
+    campaigns.find((item) => item.id === campaignId) ?? null;
+
+  const handleCampaignChange = (value: string) => {
+    if (value === "none") {
+      setCampaignId(null);
+      return;
+    }
+    setCampaignId(value);
+    const chosen = campaigns.find((item) => item.id === value);
+    if (!chosen) return;
+    const rules = chosen.rules;
+    if (rules.max_clips != null && rules.max_clips >= 1) {
+      setMaxClips(false);
+      setClipCount(Math.min(20, Math.max(1, rules.max_clips)));
+    }
+    if (
+      rules.language === "auto" ||
+      rules.language === "es" ||
+      rules.language === "en"
+    ) {
+      setLanguage(rules.language);
+    }
+    if (
+      rules.subtitle_preset &&
+      PRESET_IDS.includes(rules.subtitle_preset as (typeof PRESET_IDS)[number])
+    ) {
+      setPreset(rules.subtitle_preset);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -187,6 +222,7 @@ export function ProjectCreateForm() {
           language,
           subtitle_preset: preset,
           reframe_mode: reframeMode,
+          campaign_id: campaignId ?? undefined,
         },
         onProgress: (progress) => setUploadProgress(progress.percentage),
         signal: controller.signal,
@@ -426,19 +462,55 @@ export function ProjectCreateForm() {
             </div>
 
             <div className="mt-4 space-y-2">
-              <Label htmlFor="campaign">Campaña</Label>
-              <Select value="none" disabled>
-                <SelectTrigger id="campaign" aria-label="Campaña (próximamente)">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="campaign">Campaña</Label>
+                <Link
+                  href="/campaigns"
+                  className="text-[11px] text-amber-400 hover:text-amber-300"
+                >
+                  Gestionar campañas →
+                </Link>
+              </div>
+              <Select
+                value={campaignId ?? "none"}
+                onValueChange={handleCampaignChange}
+                disabled={isPending}
+              >
+                <SelectTrigger id="campaign" aria-label="Campaña">
                   <SelectValue placeholder="Sin campaña" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin campaña</SelectItem>
+                  {campaigns.map((camp) => (
+                    <SelectItem key={camp.id} value={camp.id}>
+                      {camp.name} ({camp.rules.min_duration ?? 20}–
+                      {camp.rules.max_duration ?? 60}s)
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <p className="flex items-center gap-1.5 text-xs text-zinc-500">
-                <Users className="size-3.5" aria-hidden="true" />
-                Las reglas de campaña llegan en un change posterior.
-              </p>
+              {selectedCampaign ? (
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+                  <Users className="size-3.5 text-amber-400" aria-hidden="true" />
+                  <span>
+                    Reglas activas: {selectedCampaign.rules.min_duration ?? 20}–
+                    {selectedCampaign.rules.max_duration ?? 60}s
+                    {selectedCampaign.rules.hashtags?.length
+                      ? ` · ${selectedCampaign.rules.hashtags.slice(0, 3).join(" ")}`
+                      : ""}
+                    {selectedCampaign.rules.banned_words?.length
+                      ? ` · ${selectedCampaign.rules.banned_words.length} prohibidas`
+                      : ""}
+                  </span>
+                </p>
+              ) : (
+                <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <Users className="size-3.5" aria-hidden="true" />
+                  {campaigns.length > 0
+                    ? "Selecciona una campaña para pre-rellenar idioma, clips y preset."
+                    : "Aún no tienes campañas creadas; puedes crearlas en Campañas."}
+                </p>
+              )}
             </div>
           </Section>
 

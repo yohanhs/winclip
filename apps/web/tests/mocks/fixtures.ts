@@ -1,4 +1,7 @@
 import type {
+  CampaignOut,
+  CampaignRules,
+  CampaignTemplateOut,
   ClipOut,
   JobSummary,
   ProjectOut,
@@ -24,6 +27,7 @@ export function makeProject(overrides: Partial<ProjectOut> = {}): ProjectOut {
     id: "proj-1",
     workspace_id: "ws-1",
     campaign_id: null,
+    campaign_name: null,
     source_type: "url",
     source_url: "https://example.com/video",
     title: "Proyecto de prueba",
@@ -58,6 +62,7 @@ export function makeClip(overrides: Partial<ClipOut> = {}): ClipOut {
     duration: 20,
     video_url: "/api/clips/clip-1/file",
     thumb_url: "/api/clips/clip-1/thumb",
+    rule_violations: [],
     created_at: "2026-01-01T10:00:00Z",
     updated_at: "2026-01-01T10:05:00Z",
     ...overrides,
@@ -87,6 +92,61 @@ export function makePreset(overrides: Partial<SubtitlePreset> = {}): SubtitlePre
     max_words_per_cue: 7,
     max_pause_sec: 0.65,
     box_bg_color: null,
+    ...overrides,
+  };
+}
+
+export function makeCampaignRules(
+  overrides: Partial<CampaignRules> = {},
+): CampaignRules {
+  return {
+    name: "Podcast Finanzas ES",
+    language: "es",
+    min_duration: 20,
+    max_duration: 60,
+    max_clips: 8,
+    priority_topics: ["ahorro", "inversión"],
+    banned_topics: ["cripto"],
+    banned_words: ["garantizado"],
+    required_keywords: ["inversión"],
+    tone: "educativo y directo",
+    hook_max_seconds: 3,
+    cta_text: "Suscríbete al canal",
+    hashtags: ["#finanzas", "#shorts"],
+    subtitle_preset: "hormozi",
+    watermark_path: null,
+    target_platforms: ["youtube", "tiktok"],
+    extra_instructions: "Sin relleno",
+    ...overrides,
+  };
+}
+
+export function makeCampaign(
+  overrides: Partial<CampaignOut> = {},
+): CampaignOut {
+  const rules = makeCampaignRules(overrides.rules);
+  return {
+    id: "camp-1",
+    workspace_id: "ws-1",
+    name: rules.name ?? "Podcast Finanzas ES",
+    rules,
+    source_text: "Brief original de finanzas",
+    projects_count: 1,
+    created_at: "2026-01-01T10:00:00Z",
+    updated_at: "2026-01-01T10:05:00Z",
+    ...overrides,
+  };
+}
+
+export function makeCampaignTemplate(
+  overrides: Partial<CampaignTemplateOut> = {},
+): CampaignTemplateOut {
+  return {
+    id: "podcast-entrevistas-es",
+    title: "Podcast y Entrevistas (ES)",
+    description: "Clips dinámicos de entrevistas en español",
+    language: "es",
+    rules: makeCampaignRules({ name: "Podcast & Entrevistas ES" }),
     ...overrides,
   };
 }

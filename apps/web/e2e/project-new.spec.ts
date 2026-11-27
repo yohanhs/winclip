@@ -13,10 +13,10 @@ test.describe("Creación de proyecto (/projects/new)", () => {
     await expect(page.getByText("Previsualización 9:16")).toBeVisible();
     await expect(page.getByText("Bold Yellow").first()).toBeVisible();
 
-    // Campaña visible pero deshabilitada hasta change 6
+    // Campaña habilitada desde change 6
     await expect(
-      page.getByRole("combobox", { name: "Campaña (próximamente)" }),
-    ).toBeDisabled();
+      page.getByRole("combobox", { name: "Campaña" }),
+    ).toBeEnabled();
 
     // Cambiar preset a Hormozi y comprobar actualización de la preview en vivo
     await page.getByRole("combobox", { name: "Preset de subtítulos" }).click();

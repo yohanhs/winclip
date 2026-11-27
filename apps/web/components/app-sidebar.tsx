@@ -19,6 +19,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { useHealth } from "@/hooks/use-api-client";
+import { useCampaigns } from "@/hooks/use-campaigns";
 import { useProjects } from "@/hooks/use-projects";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ export function AppSidebar({ appName }: { appName: string }) {
 
   const health = useHealth();
   const projects = useProjects();
+  const campaigns = useCampaigns();
 
   const checks = health.data?.checks ?? [];
   const hasError = health.isError || checks.some((check) => check.status === "error");
@@ -51,6 +53,7 @@ export function AppSidebar({ appName }: { appName: string }) {
     check.name.toLowerCase().includes("storage"),
   );
   const projectCount = projects.data?.length ?? 0;
+  const campaignCount = campaigns.data?.length ?? 0;
 
   const engineStatus = hasError
     ? { label: "Motor local · Error", color: "text-rose-400" }
@@ -64,7 +67,12 @@ export function AppSidebar({ appName }: { appName: string }) {
     <nav aria-label="Navegación principal" className="flex flex-col gap-1 px-2">
       {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
-        const count = href === "/projects" ? projectCount : 0;
+        const count =
+          href === "/projects"
+            ? projectCount
+            : href === "/campaigns"
+              ? campaignCount
+              : 0;
         return (
           <Link
             key={href}
