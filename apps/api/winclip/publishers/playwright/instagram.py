@@ -137,8 +137,18 @@ class InstagramPlaywrightPublisher:
                         page, "instagram", self._selectors, capture, step_name="open"
                     )
 
+                    # Cerrar modal de "Activar notificaciones" si aparece al abrir Instagram
+                    dismiss_notif = find_first_visible(
+                        page,
+                        ('button:has-text("Ahora no")', 'button:has-text("Not Now")'),
+                        timeout_ms=1500,
+                    )
+                    if dismiss_notif is not None:
+                        dismiss_notif.click()
+                        human_delay(self._min_delay, self._max_delay, sleep_fn=self._sleep)
+
                     create_btn = find_first_visible(
-                        page, self._selectors.create_buttons, timeout_ms=3000
+                        page, self._selectors.create_buttons, timeout_ms=4000
                     )
                     if create_btn is not None:
                         create_btn.click()
@@ -147,6 +157,23 @@ class InstagramPlaywrightPublisher:
 
                     self._report(40.0, "select_file")
                     file_input = find_first_attached(page, self._selectors.file_inputs)
+                    if file_input is None:
+                        # En la UI reciente de Instagram, "+" puede abrir un submenú ("Publicación")
+                        submenu_post = find_first_visible(
+                            page,
+                            (
+                                'a:has-text("Publicación")',
+                                'span:has-text("Publicación")',
+                                'a:has-text("Post")',
+                                'span:has-text("Post")',
+                            ),
+                            timeout_ms=2000,
+                        )
+                        if submenu_post is not None:
+                            submenu_post.click()
+                            human_delay(self._min_delay, self._max_delay, sleep_fn=self._sleep)
+                            capture.capture(page, "open_post_submenu")
+                            file_input = find_first_attached(page, self._selectors.file_inputs)
                     if file_input is None:
                         shot = capture.capture(page, "error_no_file_input")
                         raise PermanentPublishError(
@@ -159,6 +186,16 @@ class InstagramPlaywrightPublisher:
                     assert_no_challenge_or_login(
                         page, "instagram", self._selectors, capture, step_name="after_file"
                     )
+
+                    # Cerrar aviso "Los videos ahora se comparten como reels" si aparece
+                    ok_reels = find_first_visible(
+                        page,
+                        ('button:has-text("Aceptar")', 'button:has-text("OK")'),
+                        timeout_ms=1500,
+                    )
+                    if ok_reels is not None:
+                        ok_reels.click()
+                        human_delay(self._min_delay, self._max_delay, sleep_fn=self._sleep)
 
                     # Avanzar pasos intermedios "Siguiente" si aparecen (recorte / filtros)
                     for step_idx in range(2):
