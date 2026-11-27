@@ -241,25 +241,31 @@ class InstagramPlaywrightPublisher:
                         page, "instagram", self._selectors, capture, step_name="after_submit"
                     )
 
-                    # En conexiones con subida lenta o vídeos 1080p largos, Instagram puede tardar
-                    # hasta ~2-3 min en el modal "Compartiendo" antes de confirmar el Reel.
+                    # En conexiones con subida lenta o MP4 1080p grandes (~50 MB), Instagram puede
+                    # tardar 2-4 min reales en el modal "Compartiendo" antes de confirmar el Reel.
                     success = None
-                    for _ in range(36):
+                    upload_deadline = time.monotonic() + 240.0
+                    while True:
                         success = find_first_visible(
-                            page, self._selectors.success_indicators, timeout_ms=5000
+                            page, self._selectors.success_indicators, timeout_ms=2500
                         )
                         if success is not None:
                             break
-                        if self._max_delay <= 0:
+                        if self._max_delay <= 0 or time.monotonic() >= upload_deadline:
                             break
-                        still_sharing = find_first_visible(
+                        upload_failed = find_first_visible(
                             page,
-                            (':text-is("Compartiendo")', ':text-is("Sharing")'),
-                            timeout_ms=500,
+                            (
+                                ':text("No se pudo compartir")',
+                                ':text("Algo salió mal")',
+                                ':text("Something went wrong")',
+                                ':text("Your post could not be shared")',
+                            ),
+                            timeout_ms=400,
                         )
-                        if still_sharing is None and _ >= 11:
+                        if upload_failed is not None:
                             break
-                        self._sleep(1.0)
+                        self._sleep(2.0)
                     final_shot = capture.capture(page, "published")
                     if success is None:
                         raise PermanentPublishError(
