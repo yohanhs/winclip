@@ -158,22 +158,28 @@ class InstagramPlaywrightPublisher:
                     self._report(40.0, "select_file")
                     file_input = find_first_attached(page, self._selectors.file_inputs)
                     if file_input is None:
-                        # En la UI reciente de Instagram, "+" puede abrir un submenú ("Publicación")
+                        # En la UI reciente de Instagram, "+" abre un submenú con "Publicación"
                         submenu_post = find_first_visible(
                             page,
                             (
-                                'a:has-text("Publicación")',
-                                'span:has-text("Publicación")',
-                                'a:has-text("Post")',
-                                'span:has-text("Post")',
+                                'span:text-is("Publicación")',
+                                'div[role="button"]:has(:text-is("Publicación"))',
+                                'a[role="link"]:has(:text-is("Publicación"))',
+                                'span:text-is("Post")',
+                                'div[role="button"]:has(:text-is("Post"))',
+                                'a[role="link"]:has(:text-is("Post"))',
                             ),
-                            timeout_ms=2000,
+                            timeout_ms=2500,
                         )
                         if submenu_post is not None:
                             submenu_post.click()
                             human_delay(self._min_delay, self._max_delay, sleep_fn=self._sleep)
                             capture.capture(page, "open_post_submenu")
-                            file_input = find_first_attached(page, self._selectors.file_inputs)
+                            for _ in range(10):
+                                file_input = find_first_attached(page, self._selectors.file_inputs)
+                                if file_input is not None:
+                                    break
+                                self._sleep(0.5)
                     if file_input is None:
                         shot = capture.capture(page, "error_no_file_input")
                         raise PermanentPublishError(
@@ -235,9 +241,18 @@ class InstagramPlaywrightPublisher:
                         page, "instagram", self._selectors, capture, step_name="after_submit"
                     )
 
-                    success = find_first_visible(
-                        page, self._selectors.success_indicators, timeout_ms=8000
-                    )
+                    # En vídeos largos, Instagram puede tardar hasta ~45-60s en procesar el Reel
+                    success = None
+                    for _ in range(12):
+                        success = find_first_visible(
+                            page, self._selectors.success_indicators, timeout_ms=5000
+                        )
+                        if success is not None:
+                            break
+                        if self._max_delay > 0:
+                            self._sleep(1.0)
+                        else:
+                            break
                     final_shot = capture.capture(page, "published")
                     if success is None:
                         raise PermanentPublishError(
