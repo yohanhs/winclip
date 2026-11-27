@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Film, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,22 +30,17 @@ export function ClipGrid({
   projectDuration,
   isLoading = false,
 }: ClipGridProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rawSelectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [playerClip, setPlayerClip] = useState<ClipOut | null>(null);
   const [editClip, setEditClip] = useState<ClipOut | null>(null);
   const [trimClip, setTrimClip] = useState<ClipOut | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const deleteClip = useDeleteClip(projectId);
 
-  useEffect(() => {
-    setSelectedIds((current) => {
-      const available = new Set(clips.map((clip) => clip.id));
-      const next = new Set(
-        [...current].filter((id) => available.has(id)),
-      );
-      return next.size === current.size ? current : next;
-    });
-  }, [clips]);
+  const selectedIds = useMemo(() => {
+    const available = new Set(clips.map((clip) => clip.id));
+    return new Set([...rawSelectedIds].filter((id) => available.has(id)));
+  }, [clips, rawSelectedIds]);
 
   const maxDuration = useMemo(() => {
     if (projectDuration && projectDuration > 0) return projectDuration;

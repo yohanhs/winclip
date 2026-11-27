@@ -27,7 +27,7 @@
 
 ## 5. Verificación integrada
 
-- [ ] 5.1 Ejecutar `pnpm gen:api`, `pnpm --filter web lint`, `pnpm --filter web build`, `pnpm --filter web test`, `pnpm --filter web test:e2e`, comprobar responsive (móvil y escritorio) en desarrollo local con `pnpm dev`, y ejecutar `openspec validate add-web-ui-cards --strict` sin errores.
+- [x] 5.1 Ejecutar `pnpm gen:api`, `pnpm --filter web lint`, `pnpm --filter web build`, `pnpm --filter web test`, `pnpm --filter web test:e2e`, comprobar responsive (móvil y escritorio) en desarrollo local con `pnpm dev`, y ejecutar `openspec validate add-web-ui-cards --strict` sin errores.
 
 ## Workflow follow-up
 

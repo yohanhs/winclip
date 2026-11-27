@@ -114,13 +114,10 @@ export function SubtitlePresetPreview({
   className,
 }: SubtitlePresetPreviewProps) {
   const style = presetStyle(preset);
-  const [playing, setPlaying] = useState(isPlaying);
+  const [overridePlaying, setOverridePlaying] = useState<boolean | null>(null);
+  const playing = overridePlaying ?? isPlaying;
   const [lineIndex, setLineIndex] = useState(0);
   const [wordIndex, setWordIndex] = useState(1);
-
-  useEffect(() => {
-    setPlaying(isPlaying);
-  }, [isPlaying]);
 
   useEffect(() => {
     if (!playing) return;
@@ -273,7 +270,7 @@ export function SubtitlePresetPreview({
                 aria-label={playing ? "Pausar previsualización" : "Reproducir previsualización"}
                 onClick={() => {
                   const next = !playing;
-                  setPlaying(next);
+                  setOverridePlaying(next);
                   onTogglePlay?.(next);
                 }}
                 className="flex size-7 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-white/25"

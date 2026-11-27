@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,25 +26,19 @@ export interface ClipEditDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ClipEditDialog({
+function ClipEditForm({
   clip,
-  open,
   onOpenChange,
-}: ClipEditDialogProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [hashtags, setHashtags] = useState("");
-  const updateClip = useUpdateClip(clip?.project_id);
-
-  useEffect(() => {
-    if (!clip) return;
-    setTitle(clip.title);
-    setDescription(clip.description);
-    setHashtags(clip.hashtags.join(" "));
-  }, [clip]);
+}: {
+  clip: ClipOut;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [title, setTitle] = useState(clip.title);
+  const [description, setDescription] = useState(clip.description);
+  const [hashtags, setHashtags] = useState(clip.hashtags.join(" "));
+  const updateClip = useUpdateClip(clip.project_id);
 
   const handleSave = () => {
-    if (!clip) return;
     if (title.trim().length === 0) {
       toast.error("El título no puede estar vacío.");
       return;
@@ -79,6 +73,78 @@ export function ClipEditDialog({
   };
 
   return (
+    <>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="clip-title">Título</Label>
+          <Input
+            id="clip-title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            disabled={updateClip.isPending}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="clip-description">Descripción</Label>
+          <Textarea
+            id="clip-description"
+            rows={4}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            disabled={updateClip.isPending}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="clip-hashtags">Hashtags</Label>
+          <Input
+            id="clip-hashtags"
+            value={hashtags}
+            onChange={(event) => setHashtags(event.target.value)}
+            placeholder="#shorts #finanzas #ahorro"
+            disabled={updateClip.isPending}
+          />
+          <p className="text-xs text-zinc-500">
+            Sepáralos con espacios o comas. La almohadilla es opcional.
+          </p>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => onOpenChange(false)}
+          disabled={updateClip.isPending}
+        >
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={updateClip.isPending}
+        >
+          {updateClip.isPending ? (
+            <>
+              <Loader2 className="animate-spin" aria-hidden="true" />
+              Guardando…
+            </>
+          ) : (
+            "Guardar cambios"
+          )}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+export function ClipEditDialog({
+  clip,
+  open,
+  onOpenChange,
+}: ClipEditDialogProps) {
+  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
@@ -88,67 +154,13 @@ export function ClipEditDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="clip-title">Título</Label>
-            <Input
-              id="clip-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              disabled={updateClip.isPending}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="clip-description">Descripción</Label>
-            <Textarea
-              id="clip-description"
-              rows={4}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              disabled={updateClip.isPending}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="clip-hashtags">Hashtags</Label>
-            <Input
-              id="clip-hashtags"
-              value={hashtags}
-              onChange={(event) => setHashtags(event.target.value)}
-              placeholder="#shorts #finanzas #ahorro"
-              disabled={updateClip.isPending}
-            />
-            <p className="text-xs text-zinc-500">
-              Sepáralos con espacios o comas. La almohadilla es opcional.
-            </p>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={updateClip.isPending}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={updateClip.isPending}
-          >
-            {updateClip.isPending ? (
-              <>
-                <Loader2 className="animate-spin" aria-hidden="true" />
-                Guardando…
-              </>
-            ) : (
-              "Guardar cambios"
-            )}
-          </Button>
-        </DialogFooter>
+        {clip ? (
+          <ClipEditForm
+            key={`${clip.id}:${clip.updated_at}`}
+            clip={clip}
+            onOpenChange={onOpenChange}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
