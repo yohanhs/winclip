@@ -18,7 +18,7 @@ from sqlalchemy import Engine
 from sqlmodel import Session, select
 
 from winclip.core.config import Settings
-from winclip.core.ids import new_clip_id
+from winclip.core.ids import new_clip_id, new_ulid
 from winclip.core.models import Campaign, Clip, Job, Project, Publication, SocialAccount, utcnow
 from winclip.core.storage import LocalStorage
 from winclip.pipeline.ingest import extract_audio, probe_media
@@ -26,7 +26,12 @@ from winclip.pipeline.ingest import ingest as run_ingest
 from winclip.pipeline.render import apply_campaign_to_render_options, render_clip
 from winclip.pipeline.render_models import RenderOptions, RenderProgress
 from winclip.pipeline.schemas import SourceMeta
-from winclip.pipeline.select import ClipCandidate, SelectionError, select_clips
+from winclip.pipeline.select import (
+    CandidatesDocument,
+    ClipCandidate,
+    SelectionError,
+    select_clips,
+)
 from winclip.pipeline.transcribe import transcribe as run_transcribe
 from winclip.publishers.base import (
     DailyLimitExceededError,
@@ -239,21 +244,101 @@ def _project_campaign(engine: Engine, project: Project) -> tuple[str | None, Cam
     return campaign.id, CampaignRules.model_validate(campaign.rules_json)
 
 
+def _source_duration_seconds(ctx: JobContext, project: Project) -> float | None:
+    stored = _project(ctx.engine, project.id)
+    if stored.duration is not None and stored.duration > 0:
+        return float(stored.duration)
+    meta_path = ctx.storage.source_meta_path(project.id)
+    if meta_path.is_file():
+        try:
+            meta = SourceMeta.model_validate(ctx.storage.read_json(meta_path))
+            if meta.duration > 0:
+                return float(meta.duration)
+        except ValueError:
+            return None
+    return None
+
+
+def _build_full_short_fallback(
+    ctx: JobContext,
+    project: Project,
+    *,
+    requested: int | str,
+    campaign_id: str | None,
+    campaign_rules: CampaignRules | None,
+) -> list[ClipCandidate]:
+    """Cuando el vídeo ya es un short/musical y la IA devuelve 0 clips, conserva el clip entero."""
+    duration = _source_duration_seconds(ctx, project)
+    if duration is None or duration < 1.0:
+        return []
+    max_duration = campaign_rules.max_duration if campaign_rules is not None else 60.0
+    end_sec = round(min(duration, max_duration), 3)
+    if end_sec <= 0.0:
+        return []
+
+    language = "en"
+    if campaign_rules is not None and campaign_rules.language != "auto":
+        language = campaign_rules.language
+    elif project.language and project.language != "auto":
+        language = project.language
+
+    candidate = ClipCandidate(
+        id=new_ulid(),
+        start=0.0,
+        end=end_sec,
+        title=(project.title or "Clip").strip()[:120] or "Clip",
+        hook="",
+        description=(campaign_rules.cta_text or "") if campaign_rules is not None else "",
+        hashtags=list(campaign_rules.hashtags) if campaign_rules is not None else [],
+        score=75,
+        reason="Clip completo del vídeo original (vídeo corto o sin diálogo seleccionado por IA)",
+        language=language,
+        rule_violations=[],
+    )
+    requested_val: int | Any = requested if requested == "max" else int(requested)
+    document = CandidatesDocument(
+        project_id=project.id,
+        campaign_id=campaign_id,
+        requested=requested_val,
+        provider="passthrough:full-video",
+        candidates=[candidate],
+    )
+    ctx.storage.write_json_atomic(ctx.storage.selection_path(project.id), document)
+    return [candidate]
+
+
 def _run_select_stage(ctx: JobContext, project: Project, backends: PipelineBackends) -> None:
     ctx.check_cancel()
     requested: int | str = project.requested_clips or "max"
     campaign_id, campaign_rules = _project_campaign(ctx.engine, project)
-    if campaign_rules is not None:
-        result = backends.select(
-            project.id,
-            settings=ctx.settings,
-            count=requested,
-            rules=campaign_rules,
+    candidates: list[ClipCandidate]
+    try:
+        if campaign_rules is not None:
+            result = backends.select(
+                project.id,
+                settings=ctx.settings,
+                count=requested,
+                rules=campaign_rules,
+                campaign_id=campaign_id,
+            )
+        else:
+            result = backends.select(project.id, settings=ctx.settings, count=requested)
+        candidates = list(result.document.candidates)
+    except SelectionError as exc:
+        if "no contiene palabras" not in str(exc).lower():
+            raise
+        candidates = []
+
+    if not candidates:
+        candidates = _build_full_short_fallback(
+            ctx,
+            project,
+            requested=requested,
             campaign_id=campaign_id,
+            campaign_rules=campaign_rules,
         )
-    else:
-        result = backends.select(project.id, settings=ctx.settings, count=requested)
-    _sync_clips(ctx.engine, project.id, result.document.candidates)
+
+    _sync_clips(ctx.engine, project.id, candidates)
     ctx.progress(SELECT_PROGRESS_END, "select")
 
 
