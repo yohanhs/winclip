@@ -241,18 +241,25 @@ class InstagramPlaywrightPublisher:
                         page, "instagram", self._selectors, capture, step_name="after_submit"
                     )
 
-                    # En vídeos largos, Instagram puede tardar hasta ~45-60s en procesar el Reel
+                    # En conexiones con subida lenta o vídeos 1080p largos, Instagram puede tardar
+                    # hasta ~2-3 min en el modal "Compartiendo" antes de confirmar el Reel.
                     success = None
-                    for _ in range(12):
+                    for _ in range(36):
                         success = find_first_visible(
                             page, self._selectors.success_indicators, timeout_ms=5000
                         )
                         if success is not None:
                             break
-                        if self._max_delay > 0:
-                            self._sleep(1.0)
-                        else:
+                        if self._max_delay <= 0:
                             break
+                        still_sharing = find_first_visible(
+                            page,
+                            (':text-is("Compartiendo")', ':text-is("Sharing")'),
+                            timeout_ms=500,
+                        )
+                        if still_sharing is None and _ >= 11:
+                            break
+                        self._sleep(1.0)
                     final_shot = capture.capture(page, "published")
                     if success is None:
                         raise PermanentPublishError(
